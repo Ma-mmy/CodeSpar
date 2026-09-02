@@ -10,7 +10,8 @@
 #      sudo cp scripts/codespar.service.example /etc/systemd/system/codespar.service
 #      sudo systemctl daemon-reload
 #      sudo systemctl enable --now codespar
-# 5. 前面建议用 Nginx 反代 127.0.0.1:8099 并做 HTTPS / 鉴权
+# 5. 在 /var/lib/codespar/codespar.env 写默认 CODESPAR_ACCESS_PASSWORD（≥8 位）。
+#    之后可在网页「设置 → 安全」修改。前面建议用 Caddy/nginx 做 HTTPS。
 
 [Unit]
 Description=CodeSpar mock-exam service
@@ -30,6 +31,9 @@ Environment=CODESPAR_PORT=8099
 Environment=CODESPAR_BIND=127.0.0.1
 Environment=CODESPAR_DB_PATH=/var/lib/codespar/codespar.db
 Environment=CODESPAR_MASTER_KEY_FILE=/var/lib/codespar/master.key
+Environment=CODESPAR_ACCESS_HASH_FILE=/var/lib/codespar/access.hash
+# Environment=CODESPAR_ACCESS_PASSWORD=
+# Environment=CODESPAR_PUBLIC_ORIGIN=https://exam.example.com
 # Environment=CODESPAR_MASTER_KEY=
 # Environment=CODESPAR_JAVA_OPTS=-Xms256m -Xmx1g
 

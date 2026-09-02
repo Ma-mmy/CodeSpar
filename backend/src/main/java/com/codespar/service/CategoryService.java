@@ -167,10 +167,7 @@ public class CategoryService {
 
     @Transactional
     public void delete(Long id) {
-        ExamCategoryEntity e = getRequired(id);
-        if (Boolean.TRUE.equals(e.getBuiltin())) {
-            throw new BizException("内置分类不可删除，可改为禁用");
-        }
+        getRequired(id);
         mapper.deleteById(id);
     }
 

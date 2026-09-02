@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   LayoutDashboard,
   Sparkles,
@@ -8,15 +9,18 @@ import {
   Settings2,
   BookOpen,
   BookMarked,
-  Swords,
+  Zap,
   Sun,
   Moon,
-  Monitor,
+  Newspaper,
   Menu,
   X,
+  Lock,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useHideOnScroll } from '@/hooks/useHideOnScroll'
 import { useTheme, type Theme } from '@/hooks/useTheme'
+import { authApi } from '@/api/auth'
 
 const NAV = [
   { to: '/', label: '仪表盘', icon: LayoutDashboard, end: true },
@@ -32,8 +36,43 @@ const NAV = [
 const THEMES: { value: Theme; icon: typeof Sun; label: string }[] = [
   { value: 'light', icon: Sun, label: '浅色' },
   { value: 'dark', icon: Moon, label: '深色' },
-  { value: 'system', icon: Monitor, label: '跟随系统' },
+  { value: 'paper', icon: Newspaper, label: '纸质' },
 ]
+
+function LockButton() {
+  const navigate = useNavigate()
+  const qc = useQueryClient()
+  const statusQ = useQuery({
+    queryKey: ['auth-status'],
+    queryFn: authApi.status,
+    retry: false,
+    staleTime: Infinity,
+  })
+  if (!statusQ.data?.enabled) return null
+
+  return (
+    <button
+      type="button"
+      onClick={async () => {
+        try {
+          await authApi.logout()
+        } catch {
+          // 网络失败也回到解锁页
+        }
+        qc.setQueryData(['auth-status'], (prev: { enabled?: boolean; managedByConfig?: boolean } | undefined) => ({
+          enabled: prev?.enabled ?? true,
+          unlocked: false,
+          managedByConfig: prev?.managedByConfig ?? false,
+        }))
+        navigate('/unlock')
+      }}
+      className="mb-2 flex w-full items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-white/50 hover:text-foreground dark:hover:bg-white/10"
+    >
+      <Lock className="size-4" />
+      锁定
+    </button>
+  )
+}
 
 function ThemeToggle() {
   const { theme, setTheme } = useTheme()
@@ -50,7 +89,7 @@ function ThemeToggle() {
           className={cn(
             'flex flex-1 items-center justify-center rounded-lg py-1.5 transition-all duration-200',
             theme === value
-              ? 'bg-white/80 text-foreground shadow-sm dark:bg-white/15'
+              ? 'bg-white/80 text-foreground shadow-sm dark:bg-white/15 paper:bg-[color-mix(in_oklch,var(--foreground)_8%,var(--background))]'
               : 'text-muted-foreground hover:text-foreground',
           )}
         >
@@ -102,11 +141,11 @@ function Brand() {
   return (
     <div className="flex items-center gap-2.5">
       <div className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-chart-3 shadow-md shadow-primary/25">
-        <Swords className="size-[18px] text-white" />
+        <Zap className="size-[18px] text-white" />
       </div>
       <div className="min-w-0">
         <div className="truncate text-[15px] font-semibold tracking-tight">CodeSpar</div>
-        <div className="truncate text-[11px] text-muted-foreground">Agent 工程师模考</div>
+        <div className="truncate text-[11px] text-muted-foreground">轻松练·智能出题</div>
       </div>
     </div>
   )
@@ -115,6 +154,7 @@ function Brand() {
 export function AppLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const { pathname } = useLocation()
+  const headerHidden = useHideOnScroll({ resetKey: pathname, enabled: !drawerOpen })
 
   // 路由变化自动关抽屉
   useEffect(() => setDrawerOpen(false), [pathname])
@@ -138,12 +178,21 @@ export function AppLayout() {
           <NavItems />
         </div>
         <div className="pt-3">
+          <LockButton />
           <ThemeToggle />
         </div>
       </aside>
 
-      {/* ---------- 移动端顶栏 ---------- */}
-      <header className="glass-strong sticky top-0 z-30 flex items-center justify-between gap-3 px-4 py-3 md:hidden">
+      {/* ---------- 移动端顶栏：悬浮圆角条，上滑收起、下滑带回 ---------- */}
+      <header
+        className={cn(
+          'glass-strong sticky top-3 z-30 mx-3 mt-3 flex items-center justify-between gap-3 rounded-2xl px-4 py-3 md:hidden',
+          'translate-y-0 transition-[translate] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]',
+          headerHidden && 'pointer-events-none -translate-y-[calc(100%+0.75rem)]',
+        )}
+        aria-hidden={headerHidden}
+        inert={headerHidden}
+      >
         <Brand />
         <button
           type="button"
@@ -181,6 +230,7 @@ export function AppLayout() {
               <NavItems onNavigate={() => setDrawerOpen(false)} />
             </div>
             <div className="pt-3">
+              <LockButton />
               <ThemeToggle />
             </div>
           </div>

@@ -1,6 +1,18 @@
 server:
   # 端口可被 .env.local 的 CODESPAR_PORT 覆盖（config.import 已自动加载）
   port: ${CODESPAR_PORT:8099}
+  # 默认只听本机。公网请用 Caddy/nginx 反代，不要直接把 0.0.0.0 暴露出去。
+  address: ${CODESPAR_BIND:127.0.0.1}
+  forward-headers-strategy: framework
+  servlet:
+    session:
+      timeout: 7d
+      cookie:
+        name: CODESPAR_SID
+        http-only: true
+        same-site: lax
+        path: /
+        max-age: 7d
 
 spring:
   application:
@@ -73,8 +85,16 @@ codespar:
   crypto:
     # AES-256-GCM 主密钥；首次启动自动生成，权限 600
     master-key-file: ${user.home}/.codespar/master.key
+  # 公网 Origin，例如 https://exam.example.com。未设时写操作只允许 localhost / 127.0.0.1。
+  public-origin: ${CODESPAR_PUBLIC_ORIGIN:}
+  access:
+    # 系统默认口令。设置页改过之后以 hash-file 为准，此项不再覆盖。
+    password: ${CODESPAR_ACCESS_PASSWORD:}
+    hash-file: ${CODESPAR_ACCESS_HASH_FILE:${user.home}/.codespar/access.hash}
+    login-max-failures: 5
+    login-window-sec: 600
   generation:
-    max-questions-per-exam: 30
+    max-questions-per-exam: 20
     batch-concurrency: 4        # 按题型分批的并发数
     max-parse-retries: 2        # JSON 解析失败的回灌重试次数
   grading:

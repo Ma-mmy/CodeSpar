@@ -63,7 +63,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 /**
  * 组件总览页（/_ui）。
  * 所有组件的各种状态集中展示，改动设计 token 时一眼看到全局影响。
- * 深浅色都要检查 —— 用左侧栏底部的主题切换器。
+ * 浅色 / 深色 / 纸质都要检查 —— 用左侧栏底部的主题切换器。
  */
 export function UiGallery() {
   const toast = useToast()
@@ -74,7 +74,7 @@ export function UiGallery() {
     <PageContainer>
       <PageHeader
         title="组件总览"
-        description="所有 UI 组件的状态清单。改设计 token 后先来这页看全局影响，深浅色都要过一遍。"
+        description="所有 UI 组件的状态清单。改设计 token 后先来这页看全局影响，浅色、深色、纸质都要过一遍。"
       />
 
       <Section title="Button">

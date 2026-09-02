@@ -154,10 +154,19 @@ export interface SseEvent {
   data: Record<string, unknown>
 }
 
+export interface CountPresetView {
+  counts: Partial<Record<QuestionType, number>>
+  /** false：库里还没有用户保存过，返回内置默认值 */
+  saved: boolean
+}
+
 export const generationApi = {
   create: (body: GenerateRequest) => api.post<{ id: number }>('/generations', body),
   /** 仅优化出题描述，回填表单 */
   optimize: (body: OptimizeRequest) => api.post<OptimizeResult>('/generations/optimize', body),
+  getCountPreset: () => api.get<CountPresetView>('/generations/count-preset'),
+  saveCountPreset: (counts: Partial<Record<QuestionType, number>>) =>
+    api.put<CountPresetView>('/generations/count-preset', { counts }),
   list: () => api.get<GenerationView[]>('/generations'),
   get: (id: number) => api.get<GenerationView>(`/generations/${id}`),
   questions: (id: number) => api.get<QuestionView[]>(`/generations/${id}/questions`),

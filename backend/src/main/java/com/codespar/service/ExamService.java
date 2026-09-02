@@ -5,6 +5,7 @@ import com.codespar.ai.QuestionBatchDTO;
 import com.codespar.mapper.AnswerMapper;
 import com.codespar.mapper.ExamMapper;
 import com.codespar.mapper.ExamQuestionMapper;
+import com.codespar.mapper.GenerationJobMapper;
 import com.codespar.mapper.GradingMapper;
 import com.codespar.mapper.QuestionGradingMapper;
 import com.codespar.mapper.QuestionMapper;
@@ -19,6 +20,7 @@ import com.codespar.model.dto.ExamDTO.SubmitResult;
 import com.codespar.model.entity.Answer;
 import com.codespar.model.entity.Exam;
 import com.codespar.model.entity.ExamQuestion;
+import com.codespar.model.entity.GenerationJob;
 import com.codespar.model.entity.Grading;
 import com.codespar.model.entity.Question;
 import com.codespar.web.ApiExceptionHandler.BizException;
@@ -30,7 +32,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -45,6 +49,8 @@ public class ExamService {
 
     private static final Set<String> TAKEABLE = Set.of("NOT_STARTED", "IN_PROGRESS");
     private static final Set<String> READONLY = Set.of("SUBMITTED", "GRADED");
+    /** 文章开卷弹窗里的历史卷条数上限。 */
+    static final int ARTICLE_HISTORY_LIMIT = 3;
 
     private final ExamMapper examMapper;
     private final ExamQuestionMapper examQuestionMapper;
@@ -52,6 +58,7 @@ public class ExamService {
     private final AnswerMapper answerMapper;
     private final GradingMapper gradingMapper;
     private final QuestionGradingMapper questionGradingMapper;
+    private final GenerationJobMapper generationJobMapper;
     private final QuestionConverter converter;
     private final CategoryService categoryService;
 
@@ -63,13 +70,50 @@ public class ExamService {
                 .toList();
     }
 
+    /**
+     * 文章开卷的历史卷。确认组卷后即出现，不限作答/阅卷状态；只返回最近
+     * {@link #ARTICLE_HISTORY_LIMIT} 套。同时纳入「出题任务挂了文章、试卷行漏了
+     * article_id」的旧数据并回填。
+     */
     public List<ExamListItem> listByArticle(Long articleId) {
-        return examMapper.selectList(Wrappers.<Exam>lambdaQuery()
-                        .eq(Exam::getArticleId, articleId)
-                        .orderByDesc(Exam::getId))
+        if (articleId == null) {
+            return List.of();
+        }
+        Map<Long, Exam> byId = new LinkedHashMap<>();
+        for (Exam e : examMapper.selectList(Wrappers.<Exam>lambdaQuery()
+                .eq(Exam::getArticleId, articleId)
+                .orderByDesc(Exam::getId)
+                .last("LIMIT " + ARTICLE_HISTORY_LIMIT))) {
+            byId.put(e.getId(), e);
+        }
+        List<Long> jobIds = generationJobMapper.selectList(Wrappers.<GenerationJob>lambdaQuery()
+                        .eq(GenerationJob::getArticleId, articleId))
                 .stream()
-                .map(this::toListItem)
+                .map(GenerationJob::getId)
+                .filter(Objects::nonNull)
                 .toList();
+        if (!jobIds.isEmpty()) {
+            for (Exam e : examMapper.selectList(Wrappers.<Exam>lambdaQuery()
+                    .in(Exam::getJobId, jobIds)
+                    .orderByDesc(Exam::getId)
+                    .last("LIMIT " + ARTICLE_HISTORY_LIMIT))) {
+                byId.putIfAbsent(e.getId(), e);
+            }
+        }
+        List<Exam> recent = byId.values().stream()
+                .sorted(Comparator.comparing(Exam::getId).reversed())
+                .limit(ARTICLE_HISTORY_LIMIT)
+                .toList();
+        for (Exam stored : recent) {
+            if (stored.getArticleId() == null) {
+                Exam patch = new Exam();
+                patch.setId(stored.getId());
+                patch.setArticleId(articleId);
+                examMapper.updateById(patch);
+                stored.setArticleId(articleId);
+            }
+        }
+        return recent.stream().map(this::toListItem).toList();
     }
 
     /**

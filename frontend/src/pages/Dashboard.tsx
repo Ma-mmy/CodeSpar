@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
@@ -491,6 +491,96 @@ function StatCard({
   )
 }
 
+const WEAK_RING_R = 52
+const WEAK_RING_C = 2 * Math.PI * WEAK_RING_R
+
+function prefersReducedMotion() {
+  return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+}
+
+function useCountUp(target: number, delayMs: number) {
+  const [value, setValue] = useState(() => (prefersReducedMotion() ? target : 0))
+
+  useEffect(() => {
+    if (prefersReducedMotion()) {
+      setValue(target)
+      return
+    }
+    let raf = 0
+    const startAt = performance.now() + delayMs
+    const dur = 1050
+    const tick = (now: number) => {
+      if (now < startAt) {
+        raf = requestAnimationFrame(tick)
+        return
+      }
+      const t = Math.min(1, (now - startAt) / dur)
+      const eased = 1 - (1 - t) ** 3
+      setValue(Math.round(target * eased))
+      if (t < 1) raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [target, delayMs])
+
+  return value
+}
+
+function WeakRing({ rate, delayMs, gradientId }: { rate: number; delayMs: number; gradientId: string }) {
+  const clamped = Math.min(1, Math.max(0, Number(rate) || 0))
+  const offset = WEAK_RING_C * (1 - clamped)
+  const targetPct = Math.round(clamped * 100)
+  const shownPct = useCountUp(targetPct, delayMs + 120)
+
+  return (
+    <div
+      className="relative size-[6.5rem] shrink-0"
+      style={{ '--weak-delay': `${delayMs}ms` } as CSSProperties}
+    >
+      <svg viewBox="0 0 120 120" className="size-full overflow-visible" aria-hidden>
+        <defs>
+          <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="var(--primary)" />
+            <stop offset="100%" stopColor="var(--chart-3)" />
+          </linearGradient>
+        </defs>
+        <g transform="rotate(-90 60 60)">
+          <circle
+            cx="60"
+            cy="60"
+            r={WEAK_RING_R}
+            fill="none"
+            strokeWidth="9"
+            className="stroke-foreground/10"
+          />
+          <circle
+            cx="60"
+            cy="60"
+            r={WEAK_RING_R}
+            fill="none"
+            strokeWidth="9"
+            strokeLinecap="round"
+            stroke={`url(#${gradientId})`}
+            className="animate-weak-ring"
+            style={
+              {
+                strokeDasharray: WEAK_RING_C,
+                '--weak-ring-c': `${WEAK_RING_C}`,
+                '--weak-ring-offset': `${offset}`,
+              } as CSSProperties
+            }
+          />
+        </g>
+      </svg>
+      <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+        <span className={cn('text-xl font-semibold tabular-nums tracking-tight', rateTone(rate))}>
+          {shownPct}%
+        </span>
+      </div>
+    </div>
+  )
+}
+
 function WeakTagCard({
   rank,
   tag,
@@ -502,35 +592,34 @@ function WeakTagCard({
   minSample: number
   onPractice: () => void
 }) {
+  const delayMs = (rank - 1) * 90
   return (
-    <GlassCard>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-xs tabular-nums text-muted-foreground">#{rank}</span>
-            <h3 className="truncate font-medium">{tag.tag}</h3>
-            {tag.sampleInsufficient && (
-              <Badge variant="warning">样本不足（&lt; {minSample} 题）</Badge>
-            )}
+    <div
+      className="animate-weak-card-in"
+      style={{ '--weak-delay': `${delayMs}ms` } as CSSProperties}
+    >
+      <GlassCard>
+        <div className="flex items-center gap-4">
+          <WeakRing rate={tag.rate} delayMs={delayMs} gradientId={`weak-ring-${rank}`} />
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-xs tabular-nums text-muted-foreground">#{rank}</span>
+              <h3 className="truncate font-medium">{tag.tag}</h3>
+              {tag.sampleInsufficient && (
+                <Badge variant="warning">样本不足（&lt; {minSample} 题）</Badge>
+              )}
+            </div>
+            <p className="mt-1 text-sm tabular-nums text-muted-foreground">
+              {tag.questionCount} 题 · {tag.earned}/{tag.full} 分
+            </p>
+            <Button variant="primary" size="sm" className="mt-3" onClick={onPractice}>
+              <Sparkles />
+              针对此项出题
+            </Button>
           </div>
-          <p className={cn('mt-1 text-2xl font-semibold tabular-nums', rateTone(tag.rate))}>
-            {pct(tag.rate)}
-          </p>
         </div>
-        <Button variant="primary" size="sm" onClick={onPractice}>
-          <Sparkles />
-          针对此项出题
-        </Button>
-      </div>
-      <div className="mt-3">
-        <RateBar
-          label={`${tag.questionCount} 题`}
-          rate={tag.rate}
-          earned={tag.earned}
-          full={tag.full}
-        />
-      </div>
-    </GlassCard>
+      </GlassCard>
+    </div>
   )
 }
 

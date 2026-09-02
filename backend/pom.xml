@@ -91,6 +91,12 @@
             <artifactId>flyway-core</artifactId>
         </dependency>
 
+        <!-- 只用 BCrypt 哈希访问口令，不上 Spring Security 过滤器链（SPA + SSE 会打架） -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-crypto</artifactId>
+        </dependency>
+
         <!-- 工具 -->
         <dependency>
             <groupId>org.projectlombok</groupId>

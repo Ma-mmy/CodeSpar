@@ -139,8 +139,8 @@ public class PromptBuilder {
         Map<String, String> vars = new HashMap<>();
         vars.put("user_prompt", userPrompt == null ? "" : userPrompt.trim());
         vars.put("difficulty_label", DIFFICULTY_LABEL.getOrDefault(
-                params.getDifficulty() == null ? QuestionDifficulty.INTERMEDIATE : params.getDifficulty(),
-                "中级"));
+                params.getDifficulty() == null ? QuestionDifficulty.ADVANCED : params.getDifficulty(),
+                "高级"));
         vars.put("language_label", "en".equalsIgnoreCase(params.getLanguage()) ? "英文" : "中文");
         vars.put("category_label", categoryLabel(params.getCategory()));
         vars.put("tags_block", buildTagsBlock(params.getTags(), params.getCategory()));

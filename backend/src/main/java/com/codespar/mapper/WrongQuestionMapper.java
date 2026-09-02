@@ -25,7 +25,7 @@ public interface WrongQuestionMapper extends BaseMapper<WrongQuestion> {
             SELECT
               w.id, w.question_id, w.wrong_count, w.pass_streak, w.last_score_rate,
               w.last_wrong_at, w.status, w.manual_added, w.created_at,
-              q.stem, q.type, q.difficulty, q.full_score, q.reference_answer,
+              q.stem, q.options_json, q.type, q.difficulty, q.full_score, q.reference_answer,
               q.correct_answer, q.explanation,
               qg.score AS last_score, qg.comment AS last_comment,
               a.content AS last_answer

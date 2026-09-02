@@ -18,6 +18,7 @@ fi
 info "启动 CodeSpar（数据库：$DB_PATH）…"
 java -jar "$JAR_PATH" \
   --server.port="$APP_PORT" \
+  --server.address="$APP_BIND" \
   --spring.datasource.url="jdbc:sqlite:$DB_PATH?journal_mode=WAL&busy_timeout=5000&foreign_keys=on" &
 
 APP_PID=$!

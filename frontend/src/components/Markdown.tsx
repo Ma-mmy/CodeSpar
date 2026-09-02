@@ -7,7 +7,7 @@ import remarkGfm from 'remark-gfm'
  */
 export function Markdown({ children }: { children: string }) {
   return (
-    <div className="markdown-body">
+    <div className="markdown-body min-w-0 max-w-full">
       <ReactMarkdown remarkPlugins={[remarkGfm]}>{children}</ReactMarkdown>
     </div>
   )

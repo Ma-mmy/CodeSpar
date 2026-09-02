@@ -16,6 +16,7 @@
 #   CODESPAR_DB_PATH          SQLite 路径，默认 /var/lib/codespar/codespar.db
 #   CODESPAR_MASTER_KEY_FILE  主密钥文件，默认与 DB 同目录 master.key
 #   CODESPAR_MASTER_KEY       可选；若设置则优先于文件（Base64 的 32 字节）
+#   CODESPAR_ACCESS_PASSWORD  默认访问口令（至少 8 位）；设置页可改
 #   CODESPAR_JAVA_OPTS        额外 JVM 参数，如 -Xms256m -Xmx1g
 
 set -euo pipefail
@@ -42,16 +43,19 @@ CODESPAR_PORT="${CODESPAR_PORT:-8099}"
 CODESPAR_BIND="${CODESPAR_BIND:-127.0.0.1}"
 CODESPAR_DB_PATH="${CODESPAR_DB_PATH:-/var/lib/codespar/codespar.db}"
 CODESPAR_MASTER_KEY_FILE="${CODESPAR_MASTER_KEY_FILE:-$(dirname "$CODESPAR_DB_PATH")/master.key}"
+CODESPAR_ACCESS_HASH_FILE="${CODESPAR_ACCESS_HASH_FILE:-$(dirname "$CODESPAR_DB_PATH")/access.hash}"
 CODESPAR_JAVA_OPTS="${CODESPAR_JAVA_OPTS:-}"
 
 mkdir -p "$(dirname "$CODESPAR_DB_PATH")"
 mkdir -p "$(dirname "$CODESPAR_MASTER_KEY_FILE")"
+mkdir -p "$(dirname "$CODESPAR_ACCESS_HASH_FILE")"
 
 echo "==> CodeSpar"
 echo "    jar:        $CODESPAR_JAR"
 echo "    bind:       $CODESPAR_BIND:$CODESPAR_PORT"
 echo "    db:         $CODESPAR_DB_PATH"
 echo "    master-key: ${CODESPAR_MASTER_KEY:+(环境变量 CODESPAR_MASTER_KEY)}${CODESPAR_MASTER_KEY:-$CODESPAR_MASTER_KEY_FILE}"
+echo "    access-hash:${CODESPAR_ACCESS_HASH_FILE}"
 echo "    health:     http://${CODESPAR_BIND}:$CODESPAR_PORT/api/health"
 
 # 前台 exec，便于 systemd 接管进程；Ctrl+C / systemctl stop 可正常结束
@@ -60,4 +64,5 @@ exec java $CODESPAR_JAVA_OPTS -jar "$CODESPAR_JAR" \
   --server.address="$CODESPAR_BIND" \
   --server.port="$CODESPAR_PORT" \
   --spring.datasource.url="jdbc:sqlite:${CODESPAR_DB_PATH}?journal_mode=WAL&busy_timeout=30000&foreign_keys=on" \
-  --codespar.crypto.master-key-file="$CODESPAR_MASTER_KEY_FILE"
+  --codespar.crypto.master-key-file="$CODESPAR_MASTER_KEY_FILE" \
+  --codespar.access.hash-file="$CODESPAR_ACCESS_HASH_FILE"

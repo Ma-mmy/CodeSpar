@@ -29,18 +29,11 @@ public class HealthController {
     public Map<String, Object> health() {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("app", appName);
-        result.put("status", "UP");
         try {
-            // SQLite 专用：sqlite_master 是系统表，排除系统内部表后统计业务表
-            String version = jdbcTemplate.queryForObject("SELECT sqlite_version()", String.class);
-            Integer tables = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
-                    Integer.class);
-            result.put("db", version);
-            result.put("tables", tables);
+            jdbcTemplate.queryForObject("SELECT 1", Integer.class);
+            result.put("status", "UP");
         } catch (Exception e) {
             result.put("status", "DEGRADED");
-            result.put("dbError", e.getMessage());
         }
         return result;
     }

@@ -26,11 +26,11 @@ public class GenerationDTO {
         /** 基于文章考点摘要出题时传入；长文摘要由服务端注入，不塞进 prompt */
         private Long articleId;
 
-        /** 每种题型要几道，value 为 0 的题型不生成 */
+        /** 每种题型要几道（每种最多 20）；value 为 0 的题型不生成。整卷无单独总数上限。 */
         @NotNull(message = "请至少设置一种题型")
         private Map<QuestionType, Integer> counts;
 
-        private QuestionDifficulty difficulty = QuestionDifficulty.INTERMEDIATE;
+        private QuestionDifficulty difficulty = QuestionDifficulty.ADVANCED;
 
         /** 用户指定的知识点标签，可选；会尽量归一到主分类白名单 */
         private List<String> tags;
@@ -66,7 +66,7 @@ public class GenerationDTO {
 
         private Map<QuestionType, Integer> counts;
 
-        private QuestionDifficulty difficulty = QuestionDifficulty.INTERMEDIATE;
+        private QuestionDifficulty difficulty = QuestionDifficulty.ADVANCED;
 
         private List<String> tags;
 
@@ -96,6 +96,27 @@ public class GenerationDTO {
         }
     }
 
+    /** 出题页题型数量预设。 */
+    @Data
+    public static class CountPresetView {
+        private Map<QuestionType, Integer> counts;
+        /** false：库里还没有用户保存过，返回内置默认值 */
+        private boolean saved;
+
+        public static CountPresetView of(Map<QuestionType, Integer> counts, boolean saved) {
+            CountPresetView v = new CountPresetView();
+            v.counts = counts;
+            v.saved = saved;
+            return v;
+        }
+    }
+
+    @Data
+    public static class CountPresetRequest {
+        @NotNull(message = "请至少设置一种题型")
+        private Map<QuestionType, Integer> counts;
+    }
+
     /** 存入 generation_job.params_json 的参数快照（不含 prompt，prompt 单独一列）。 */
     @Data
     public static class GenerateParams {
@@ -109,6 +130,11 @@ public class GenerationDTO {
         private DedupStrength dedupStrength;
         /** null / true = 自动优化；false = 跳过 */
         private Boolean autoOptimize;
+
+        /** 缺省或 true 才跑提示词优化；显式 false 必须跳过。 */
+        public boolean shouldAutoOptimize() {
+            return autoOptimize == null || Boolean.TRUE.equals(autoOptimize);
+        }
 
         public static GenerateParams from(GenerateRequest req) {
             GenerateParams p = new GenerateParams();

@@ -1,7 +1,9 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AppLayout } from '@/components/AppLayout'
+import { AuthGate } from '@/components/AuthGate'
 import { Dashboard } from '@/pages/Dashboard'
+import { UnlockPage } from '@/pages/UnlockPage'
 import { ModelsPage } from '@/pages/models/ModelsPage'
 import { GeneratePage } from '@/pages/generate/GeneratePage'
 import { GenerateRunPage } from '@/pages/generate/GenerateRunPage'
@@ -15,6 +17,7 @@ import { WrongBookPage } from '@/pages/wrong-book/WrongBookPage'
 import { SettingsLayout } from '@/pages/settings/SettingsPage'
 import { PromptsSettingsPage } from '@/pages/settings/PromptsSettingsPage'
 import { CategoriesSettingsPage } from '@/pages/settings/CategoriesSettingsPage'
+import { SecuritySettingsPage } from '@/pages/settings/SecuritySettingsPage'
 import { Placeholder } from '@/pages/Placeholder'
 import { UiGallery } from '@/pages/UiGallery'
 import { ToastProvider, TooltipProvider } from '@/components/ui'
@@ -30,27 +33,31 @@ export default function App() {
         <ToastProvider>
           <BrowserRouter>
             <Routes>
-              <Route element={<AppLayout />}>
-                <Route index element={<Dashboard />} />
-                <Route path="models" element={<Navigate to="/settings/models" replace />} />
-                <Route path="settings" element={<SettingsLayout />}>
-                  <Route index element={<Navigate to="models" replace />} />
-                  <Route path="models" element={<ModelsPage embedded />} />
-                  <Route path="prompts" element={<PromptsSettingsPage />} />
-                  <Route path="categories" element={<CategoriesSettingsPage />} />
+              <Route path="unlock" element={<UnlockPage />} />
+              <Route element={<AuthGate />}>
+                <Route element={<AppLayout />}>
+                  <Route index element={<Dashboard />} />
+                  <Route path="models" element={<Navigate to="/settings/models" replace />} />
+                  <Route path="settings" element={<SettingsLayout />}>
+                    <Route index element={<Navigate to="models" replace />} />
+                    <Route path="models" element={<ModelsPage embedded />} />
+                    <Route path="prompts" element={<PromptsSettingsPage />} />
+                    <Route path="categories" element={<CategoriesSettingsPage />} />
+                    <Route path="security" element={<SecuritySettingsPage />} />
+                  </Route>
+                  <Route path="articles" element={<ArticlesPage />} />
+                  <Route path="generate" element={<GeneratePage />} />
+                  <Route path="generate/:jobId" element={<GenerateRunPage />} />
+                  <Route path="wrong-book" element={<WrongBookPage />} />
+                  <Route path="exams" element={<ExamsPage />} />
+                  <Route path="exams/:id/take" element={<TakeExamPage />} />
+                  <Route path="exams/:id/report" element={<ReportPage />} />
+                  <Route path="history/generations" element={<GenerationsHistoryPage />} />
+                  <Route path="history/gradings" element={<GradingsHistoryPage />} />
+                  {/* 组件总览：开发用，不进导航栏 */}
+                  <Route path="_ui" element={<UiGallery />} />
+                  <Route path="*" element={<Placeholder title="页面不存在" phase="—" />} />
                 </Route>
-                <Route path="articles" element={<ArticlesPage />} />
-                <Route path="generate" element={<GeneratePage />} />
-                <Route path="generate/:jobId" element={<GenerateRunPage />} />
-                <Route path="wrong-book" element={<WrongBookPage />} />
-                <Route path="exams" element={<ExamsPage />} />
-                <Route path="exams/:id/take" element={<TakeExamPage />} />
-                <Route path="exams/:id/report" element={<ReportPage />} />
-                <Route path="history/generations" element={<GenerationsHistoryPage />} />
-                <Route path="history/gradings" element={<GradingsHistoryPage />} />
-                {/* 组件总览：开发用，不进导航栏 */}
-                <Route path="_ui" element={<UiGallery />} />
-                <Route path="*" element={<Placeholder title="页面不存在" phase="—" />} />
               </Route>
             </Routes>
           </BrowserRouter>

@@ -1,6 +1,6 @@
 import { api } from './client'
 import type { ExamDetail } from './exams'
-import type { Difficulty, QuestionType } from './generation'
+import type { Difficulty, Option, QuestionType } from './generation'
 
 export type WrongStatus = 'ACTIVE' | 'MASTERED'
 
@@ -10,6 +10,7 @@ export interface WrongItem {
   type: QuestionType
   difficulty: Difficulty
   stem: string
+  options?: Option[]
   referenceAnswer?: string
   correctAnswer?: string
   explanation?: string

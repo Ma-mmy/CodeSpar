@@ -73,6 +73,16 @@ function truncatePrompt(s: string) {
   return s.length > 40 ? s.slice(0, 40) + '…' : s
 }
 
+/** 关自动优化时 skip 也会写入 optimizedPrompt，不能当成「又优化了一遍」。 */
+function instructionBox(job: GenerationView): { title: string; text: string } | null {
+  const text = job.optimizedPrompt
+  if (!text || text === job.prompt) return null
+  return {
+    title: job.params?.autoOptimize === false ? '实际出题指令' : '优化后的出题指令',
+    text,
+  }
+}
+
 function BatchRow({ batch }: { batch: BatchResultView }) {
   const status = batch.status
   const Icon =
@@ -215,7 +225,7 @@ export function GenerateRunPage() {
         const [j, bs] = await Promise.all([generationApi.get(id), generationApi.batches(id)])
         setJob(j)
         setBatches(bs)
-        if (j.optimizedPrompt) setRunStep('generate')
+        if (j.optimizedPrompt || j.params?.autoOptimize === false) setRunStep('generate')
         if (j.status !== 'RUNNING') {
           await finishToPreview(id)
         }
@@ -247,6 +257,9 @@ export function GenerateRunPage() {
                   }
                 : prev,
             )
+            if (e.data.skipped) {
+              break
+            }
             if (e.data.fallback) {
               toast('提示词优化未成功，已用原文继续出题', {
                 variant: 'warning',
@@ -317,7 +330,7 @@ export function GenerateRunPage() {
         if (cancelled) return
         setJob(j)
         setBatches(bs)
-        setRunStep(j.optimizedPrompt ? 'generate' : 'optimize')
+        setRunStep(j.optimizedPrompt || j.params?.autoOptimize === false ? 'generate' : 'optimize')
         if (j.status === 'RUNNING') {
           setPhase('running')
           openStream(jobId)
@@ -429,8 +442,11 @@ export function GenerateRunPage() {
   }
 
   if (phase === 'running' && job) {
+    const skippedOptimize = job.params?.autoOptimize === false
+    const step = skippedOptimize ? 'generate' : runStep
+    const instruction = instructionBox(job)
     const pct =
-      runStep === 'optimize'
+      step === 'optimize'
         ? 8
         : job.requestedCount > 0
           ? Math.min(100, Math.round((job.generatedCount / job.requestedCount) * 100))
@@ -443,7 +459,7 @@ export function GenerateRunPage() {
             <div className="flex items-center gap-2">
               <Loader2 className="size-4 animate-spin text-primary" />
               <span className="text-sm font-medium">
-                {runStep === 'optimize' ? '正在优化出题要求…' : '模型正在生成题目…'}
+                {step === 'optimize' ? '正在优化出题要求…' : '模型正在生成题目…'}
               </span>
             </div>
             <Button variant="outline" size="sm" onClick={handleCancel}>
@@ -454,20 +470,20 @@ export function GenerateRunPage() {
           <div className="mt-4 flex items-center gap-4">
             <Progress value={pct} className="flex-1" />
             <span className="shrink-0 text-sm tabular-nums text-muted-foreground">
-              {runStep === 'optimize' ? '优化中' : `${job.generatedCount}/${job.requestedCount}`}
+              {step === 'optimize' ? '优化中' : `${job.generatedCount}/${job.requestedCount}`}
             </span>
           </div>
           <p className="mt-3 text-[13px] text-muted-foreground">
             已用 {job.promptTokens + job.completionTokens} tokens · 耗时 {(job.costMs / 1000).toFixed(1)}s
           </p>
-          {job.optimizedPrompt && (
+          {instruction && (
             <div className="mt-4 rounded-xl border border-border/70 bg-black/4 p-3 dark:bg-white/6">
-              <p className="text-[12px] font-medium text-muted-foreground">优化后的出题指令</p>
-              <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed">{job.optimizedPrompt}</p>
+              <p className="text-[12px] font-medium text-muted-foreground">{instruction.title}</p>
+              <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed">{instruction.text}</p>
             </div>
           )}
         </GlassCard>
-        {runStep === 'generate' && (
+        {step === 'generate' && (
           <GlassCard className="mt-4">
             <h2 className="text-sm font-medium">批次进度</h2>
             <div className="mt-1 divide-y divide-border">
@@ -486,15 +502,16 @@ export function GenerateRunPage() {
   const failed = batches.filter((b) => b.status === 'FAILED')
   const totalScore = questions.reduce((s, q) => s + q.fullScore, 0)
   const badge = JOB_BADGE[job?.status ?? 'SUCCESS']
+  const previewInstruction = job ? instructionBox(job) : null
 
   return (
     <PageContainer>
       <PageHeader title="出题预览" description={job ? truncatePrompt(job.prompt) : undefined} />
 
-      {job?.optimizedPrompt && job.optimizedPrompt !== job.prompt && (
+      {previewInstruction && (
         <GlassCard className="mb-4">
-          <p className="text-[12px] font-medium text-muted-foreground">优化后的出题指令</p>
-          <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed">{job.optimizedPrompt}</p>
+          <p className="text-[12px] font-medium text-muted-foreground">{previewInstruction.title}</p>
+          <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed">{previewInstruction.text}</p>
         </GlassCard>
       )}
 
@@ -515,7 +532,9 @@ export function GenerateRunPage() {
               variant="outline"
               size="sm"
               onClick={() =>
-                navigate('/generate', { state: job ? prefillFromJob(job) : undefined })
+                navigate(job?.articleId != null ? `/generate?articleId=${job.articleId}` : '/generate', {
+                  state: job ? prefillFromJob(job) : undefined,
+                })
               }
             >
               <ArrowLeft />
@@ -554,7 +573,7 @@ export function GenerateRunPage() {
       )}
 
       {questions.length > 0 && (
-        <div className="mt-4 grid gap-4">
+        <div className="mt-4 grid min-w-0 grid-cols-1 gap-4">
           {questions.map((q) => (
             <QuestionCard
               key={q.id}

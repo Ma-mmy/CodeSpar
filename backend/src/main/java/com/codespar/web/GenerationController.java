@@ -3,6 +3,8 @@ package com.codespar.web;
 import com.codespar.ai.GenerationEventHub;
 import com.codespar.model.dto.GenerationDTO.BatchResultView;
 import com.codespar.model.dto.GenerationDTO.ConfirmResult;
+import com.codespar.model.dto.GenerationDTO.CountPresetRequest;
+import com.codespar.model.dto.GenerationDTO.CountPresetView;
 import com.codespar.model.dto.GenerationDTO.GenerateRequest;
 import com.codespar.model.dto.GenerationDTO.GenerationView;
 import com.codespar.model.dto.GenerationDTO.OptimizeRequest;
@@ -11,6 +13,7 @@ import com.codespar.model.dto.GenerationDTO.QuestionView;
 import com.codespar.model.dto.GenerationDTO.RegenerateRequest;
 import com.codespar.model.entity.GenerationJob;
 import com.codespar.model.enums.QuestionType;
+import com.codespar.service.GenerationCountPresetService;
 import com.codespar.service.GenerationService;
 import com.codespar.service.QuestionService;
 import jakarta.validation.Valid;
@@ -22,6 +25,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -44,6 +48,7 @@ import java.util.Map;
 public class GenerationController {
 
     private final GenerationService service;
+    private final GenerationCountPresetService countPresetService;
     private final GenerationEventHub hub;
     private final QuestionService questionService;
 
@@ -56,6 +61,17 @@ public class GenerationController {
     @PostMapping("/generations/optimize")
     public OptimizeResult optimize(@Valid @RequestBody OptimizeRequest req) {
         return service.optimizeOnly(req);
+    }
+
+    /** 出题页题型数量预设（落库，不是 localStorage）。 */
+    @GetMapping("/generations/count-preset")
+    public CountPresetView getCountPreset() {
+        return countPresetService.get();
+    }
+
+    @PutMapping("/generations/count-preset")
+    public CountPresetView saveCountPreset(@Valid @RequestBody CountPresetRequest req) {
+        return countPresetService.save(req);
     }
 
     @GetMapping("/generations")

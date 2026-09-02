@@ -9,6 +9,7 @@ FRONTEND_DIR="$PROJECT_ROOT/frontend"
 JAR_PATH="$BACKEND_DIR/target/codespar.jar"
 
 APP_PORT="${CODESPAR_PORT:-8099}"
+APP_BIND="${CODESPAR_BIND:-127.0.0.1}"
 VITE_PORT="${CODESPAR_VITE_PORT:-5173}"
 
 # 本地环境变量文件（存端口等，已被 .gitignore 忽略）
@@ -17,6 +18,7 @@ if [[ -f "$ENV_FILE" ]]; then
   # shellcheck disable=SC1090
   set -a; source "$ENV_FILE"; set +a
   APP_PORT="${CODESPAR_PORT:-8099}"
+  APP_BIND="${CODESPAR_BIND:-127.0.0.1}"
   VITE_PORT="${CODESPAR_VITE_PORT:-5173}"
 fi
 

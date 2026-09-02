@@ -3,10 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { BookMarked, RotateCcw, Sparkles, Trash2 } from 'lucide-react'
 import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
   Alert,
   Badge,
   Button,
@@ -32,6 +28,7 @@ import {
   useToast,
 } from '@/components/ui'
 import { Markdown } from '@/components/Markdown'
+import { QuestionOptions } from '@/components/QuestionOptions'
 import { DIFFICULTIES, QUESTION_TYPES } from '@/api/generation'
 import { wrongBookApi, type WrongItem } from '@/api/wrongBook'
 import { cn } from '@/lib/utils'
@@ -79,7 +76,7 @@ export function WrongBookPage() {
   const compose = useMutation({
     mutationFn: () => {
       const n = Number(limit)
-      const cap = Number.isFinite(n) ? Math.max(1, Math.min(30, Math.floor(n))) : 10
+      const cap = Number.isFinite(n) ? Math.max(1, Math.min(20, Math.floor(n))) : 10
       return wrongBookApi.compose({
         questionIds: selectedInView.length > 0 ? selectedInView : undefined,
         tag: selectedInView.length > 0 || tag === 'ALL' ? undefined : tag,
@@ -250,13 +247,13 @@ export function WrongBookPage() {
               答完交卷后若连续达标，可自动标为已掌握。
             </DialogDescription>
           </DialogHeader>
-          <Field label="题量上限" description="最多 30 道。超过上限时取最近错的。">
+          <Field label="题量上限" description="最多 20 道。超过上限时取最近错的。">
             {(id) => (
               <Input
                 id={id}
                 type="number"
                 min={1}
-                max={30}
+                max={20}
                 value={limit}
                 onChange={(e) => setLimit(e.target.value)}
               />
@@ -297,6 +294,110 @@ export function WrongBookPage() {
   )
 }
 
+function WrongMeta({ item }: { item: WrongItem }) {
+  const rate = item.lastScoreRate
+  return (
+    <p className="text-sm text-muted-foreground">
+      错 {item.wrongCount} 次
+      {item.lastScore != null && (
+        <>
+          {' '}
+          · 最近 {item.lastScore}/{item.fullScore}
+        </>
+      )}
+      {rate != null && (
+        <>
+          {' '}
+          · 得分率{' '}
+          <span
+            className={cn(
+              'tabular-nums font-medium text-foreground',
+              rate < 0.6 && 'text-destructive',
+              rate >= 0.8 && 'text-success',
+            )}
+          >
+            {pct(rate)}
+          </span>
+        </>
+      )}
+      {item.lastWrongAt && <> · {formatTime(item.lastWrongAt)}</>}
+    </p>
+  )
+}
+
+function WrongBadges({ item }: { item: WrongItem }) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <Badge variant="primary">{QUESTION_TYPES[item.type]}</Badge>
+      {item.difficulty && <Badge variant="outline">{DIFFICULTIES[item.difficulty]}</Badge>}
+      {item.tags.map((t) => (
+        <Badge key={t} variant="outline">
+          {t}
+        </Badge>
+      ))}
+      {item.status === 'MASTERED' && <Badge variant="success">已掌握</Badge>}
+      {item.manualAdded && <Badge variant="neutral">手动加入</Badge>}
+    </div>
+  )
+}
+
+function WrongQuestionBody({ item }: { item: WrongItem }) {
+  const hasOptions = !!item.options && item.options.length > 0
+  return (
+    <div className="space-y-4">
+      <div>
+        <h4 className="mb-2 text-sm font-medium text-muted-foreground">题干</h4>
+        <Markdown>{item.stem}</Markdown>
+        {hasOptions && item.options && (
+          <QuestionOptions
+            options={item.options}
+            userAnswer={item.lastAnswer}
+            correctAnswer={item.correctAnswer}
+          />
+        )}
+      </div>
+      {!hasOptions && (
+        <div>
+          <h4 className="mb-2 text-sm font-medium text-muted-foreground">你的作答</h4>
+          {item.lastAnswer ? (
+            <div className="rounded-xl bg-black/4 p-3 dark:bg-white/6">
+              <Markdown>{item.lastAnswer}</Markdown>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">（未作答）</p>
+          )}
+        </div>
+      )}
+      <div>
+        <h4 className="mb-2 text-sm font-medium text-muted-foreground">答案解析</h4>
+        {item.referenceAnswer || item.explanation || (item.correctAnswer && !hasOptions) ? (
+          <div className="rounded-xl bg-black/4 p-3 dark:bg-white/6">
+            {item.correctAnswer && !hasOptions && (
+              <p className="mb-2 text-sm">
+                <span className="text-muted-foreground">正确答案：</span>
+                {item.correctAnswer}
+              </p>
+            )}
+            {item.referenceAnswer && <Markdown>{item.referenceAnswer}</Markdown>}
+            {item.explanation && (
+              <div
+                className={cn(
+                  item.referenceAnswer && 'mt-2 border-t border-border pt-2',
+                  'text-sm text-muted-foreground',
+                )}
+              >
+                <Markdown>{item.explanation}</Markdown>
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">—</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function WrongCard({
   item,
   checked,
@@ -308,7 +409,7 @@ function WrongCard({
   onChecked: (on: boolean) => void
   onRemove: () => void
 }) {
-  const rate = item.lastScoreRate
+  const [open, setOpen] = useState(false)
   return (
     <GlassCard>
       <div className="flex items-start gap-3">
@@ -319,100 +420,45 @@ function WrongCard({
           aria-label={`选择第 ${item.questionId} 题`}
         />
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <Badge variant="primary">{QUESTION_TYPES[item.type]}</Badge>
-            {item.difficulty && <Badge variant="outline">{DIFFICULTIES[item.difficulty]}</Badge>}
-            {item.tags.map((t) => (
-              <Badge key={t} variant="outline">
-                {t}
-              </Badge>
-            ))}
-            {item.status === 'MASTERED' && <Badge variant="success">已掌握</Badge>}
-            {item.manualAdded && <Badge variant="neutral">手动加入</Badge>}
-          </div>
+          <WrongBadges item={item} />
           <div className="mt-2 line-clamp-4 text-sm leading-relaxed">
             <Markdown>{item.stem}</Markdown>
           </div>
-          <p className="mt-2 text-sm text-muted-foreground">
-            错 {item.wrongCount} 次
-            {rate != null && (
-              <>
-                {' '}
-                · 最近得分率{' '}
-                <span
-                  className={cn(
-                    'tabular-nums font-medium text-foreground',
-                    rate < 0.6 && 'text-destructive',
-                    rate >= 0.8 && 'text-success',
-                  )}
-                >
-                  {pct(rate)}
-                </span>
-              </>
-            )}
-            {item.lastWrongAt && <> · {formatTime(item.lastWrongAt)}</>}
-          </p>
-
-          <Accordion type="single" collapsible className="mt-3">
-            <AccordionItem value="detail">
-              <AccordionTrigger className="text-sm">作答与参考</AccordionTrigger>
-              <AccordionContent>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <h4 className="mb-1.5 text-xs font-medium text-muted-foreground">当时作答</h4>
-                    {item.lastAnswer ? (
-                      <div className="rounded-xl bg-black/4 p-3 text-sm dark:bg-white/6">
-                        <Markdown>{item.lastAnswer}</Markdown>
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">（无作答记录）</p>
-                    )}
-                  </div>
-                  <div>
-                    <h4 className="mb-1.5 text-xs font-medium text-muted-foreground">参考答案</h4>
-                    {item.correctAnswer || item.referenceAnswer || item.explanation ? (
-                      <div className="rounded-xl bg-black/4 p-3 text-sm dark:bg-white/6">
-                        {item.correctAnswer && (
-                          <p className="mb-2">
-                            <span className="text-muted-foreground">正确答案：</span>
-                            {item.correctAnswer}
-                          </p>
-                        )}
-                        {item.referenceAnswer && <Markdown>{item.referenceAnswer}</Markdown>}
-                        {item.explanation && (
-                          <div className="mt-2 border-t border-border pt-2 text-muted-foreground">
-                            <Markdown>{item.explanation}</Markdown>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">—</p>
-                    )}
-                  </div>
-                </div>
-                {item.lastComment && (
-                  <div className="mt-3">
-                    <h4 className="mb-1.5 text-xs font-medium text-muted-foreground">点评</h4>
-                    <div className="rounded-xl bg-primary/6 p-3 text-sm dark:bg-primary/10">
-                      <Markdown>{item.lastComment}</Markdown>
-                    </div>
-                  </div>
-                )}
-              </AccordionContent>
-            </AccordionItem>
-          </Accordion>
+          <div className="mt-2">
+            <WrongMeta item={item} />
+          </div>
         </div>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          title="移出"
-          aria-label="移出错题本"
-          onClick={onRemove}
-          className="shrink-0 text-muted-foreground hover:text-foreground"
-        >
-          <Trash2 />
-        </Button>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
+            详情
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            title="移出"
+            aria-label="移出错题本"
+            onClick={onRemove}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <Trash2 />
+          </Button>
+        </div>
       </div>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>题目详情</DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-2">
+                <WrongBadges item={item} />
+                <WrongMeta item={item} />
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <WrongQuestionBody item={item} />
+        </DialogContent>
+      </Dialog>
     </GlassCard>
   )
 }

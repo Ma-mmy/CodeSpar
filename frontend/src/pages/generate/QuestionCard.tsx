@@ -14,14 +14,14 @@ const TYPE_VARIANT: Record<QuestionView['type'], 'primary' | 'success' | 'warnin
 
 function Collapsible({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <details className="group rounded-xl border border-border bg-white/35 dark:bg-white/6">
+    <details className="group min-w-0 overflow-hidden rounded-xl border border-border bg-white/35 dark:bg-white/6">
       <summary className="flex cursor-pointer items-center justify-between gap-3 px-3.5 py-2.5 text-sm font-medium text-muted-foreground transition-colors select-none hover:text-foreground">
         {title}
         <span className="text-[11px] font-normal text-muted-foreground/70 transition-transform group-open:rotate-180">
           ▼
         </span>
       </summary>
-      <div className="border-t border-border px-3.5 py-3">{children}</div>
+      <div className="min-w-0 border-t border-border px-3.5 py-3">{children}</div>
     </details>
   )
 }
@@ -36,7 +36,7 @@ export function QuestionCard({
   onDelete: () => void
 }) {
   return (
-    <div className="glass rounded-2xl p-5 sm:p-6">
+    <div className="glass min-w-0 overflow-hidden rounded-2xl p-5 sm:p-6">
       {/* 头部信息 */}
       <div className="flex flex-wrap items-center gap-1.5">
         <Badge variant={TYPE_VARIANT[question.type]}>{QUESTION_TYPES[question.type]}</Badge>
@@ -51,7 +51,7 @@ export function QuestionCard({
       </div>
 
       {/* 题干 */}
-      <div className="mt-3.5">
+      <div className="mt-3.5 min-w-0">
         <Markdown>{question.stem}</Markdown>
       </div>
 
@@ -64,7 +64,7 @@ export function QuestionCard({
               className="flex items-start gap-2 rounded-lg px-2.5 py-1.5 text-sm text-muted-foreground"
             >
               <span className="shrink-0 font-mono text-xs">{o.key}.</span>
-              <span className="min-w-0">{o.text}</span>
+              <span className="min-w-0 break-words">{o.text}</span>
             </div>
           ))}
         </div>
@@ -101,7 +101,7 @@ export function QuestionCard({
                   <span className="mt-px shrink-0 rounded bg-primary/10 px-1.5 py-px text-xs font-medium text-primary">
                     {r.score} 分
                   </span>
-                  <span className="min-w-0">{r.point}</span>
+                  <span className="min-w-0 break-words">{r.point}</span>
                 </li>
               ))}
             </ul>

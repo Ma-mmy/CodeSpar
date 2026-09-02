@@ -238,6 +238,14 @@ PRD 要求 JSON 解析成功率 > 95%。这是全项目最大的不确定性来�
 - **返回给前端的 DTO 永远是掩码**（`sk-abc…xyz`），明文只在服务端解密后直接用于构造 HTTP 客户端
 - Logback 配置屏蔽敏感字段；导出功能（PRD NFR6）显式排除 key
 
+### 5.4 访问口令与远程访问
+
+不上账号。一个实例一把口令：配置 `CODESPAR_ACCESS_PASSWORD` 是默认值，设置页改过之后以 `access.hash` 为准。会话 Cookie `CODESPAR_SID`（HttpOnly、SameSite=Lax），SSE 同源自动带 Cookie。
+
+- 未设口令且只听 `127.0.0.1`：本机免解锁（开发默认）
+- 听非回环地址却没口令：**拒绝启动**
+- 公网：配置里写口令即可；建议 Caddy/nginx 终止 TLS，反代到 `127.0.0.1:8099`
+
 ---
 
 ## 6. 出题流程实现（按题型分批并发 + SSE）
@@ -308,6 +316,7 @@ model_profile      模型配置（name, provider_type, base_url, api_key_cipher,
                               supports_json_mode, enabled, is_default_gen, is_default_grade)
 tag                知识点标签（name UNIQUE）
 prompt_preset      提示词预设（name, prompt, params_json）
+generation_count_preset  出题页题型数量预设（单行 counts_json）
 
 generation_job     出题任务（prompt, params_json, model_profile_id, status,
                              prompt_tokens, completion_tokens, cost_ms, error_msg, raw_output)

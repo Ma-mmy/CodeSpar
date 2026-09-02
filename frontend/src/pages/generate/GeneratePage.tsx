@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Sparkles, Wand2 } from 'lucide-react'
+import { Bookmark, Save, Sparkles, Wand2 } from 'lucide-react'
 import {
   Alert,
   Badge,
@@ -15,6 +15,7 @@ import {
   Field,
   GlassCard,
   Input,
+  Label,
   OptionCard,
   PageContainer,
   PageHeader,
@@ -48,6 +49,14 @@ import {
 import { categoriesApi } from '@/api/categories'
 import { presetsApi, type PromptPreset } from '@/api/presets'
 import { TagInput } from './TagInput'
+import {
+  MAX_QUESTIONS_PER_TYPE,
+  clampCounts,
+  clearLegacyLocalPreset,
+  countsEqual,
+  peekLegacyLocalPreset,
+  resolvedCountPreset,
+} from './countPreset'
 
 const DIFFICULTY_ORDER: Difficulty[] = ['BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'EXPERT']
 
@@ -68,9 +77,17 @@ export type GeneratePrefillState = {
   fromJobId?: number
 }
 
+function articleIdFromSearch(search: string): number | undefined {
+  const raw = new URLSearchParams(search).get('articleId')
+  if (!raw) return undefined
+  const n = Number(raw)
+  return Number.isFinite(n) && n > 0 ? n : undefined
+}
+
 export function GeneratePage() {
   const navigate = useNavigate()
   const location = useLocation()
+  const [searchParams, setSearchParams] = useSearchParams()
   const toast = useToast()
   const qc = useQueryClient()
 
@@ -90,6 +107,10 @@ export function GeneratePage() {
     queryKey: ['presets'],
     queryFn: presetsApi.list,
   })
+  const { data: countPresetView } = useQuery({
+    queryKey: ['generation-count-preset'],
+    queryFn: generationApi.getCountPreset,
+  })
 
   const generateModels = useMemo(
     () => (models ?? []).filter((m) => m.canGenerate && m.enabled),
@@ -97,27 +118,41 @@ export function GeneratePage() {
   )
   const defaultModel = generateModels.find((m) => m.isDefaultGenerate) ?? generateModels[0]
 
-  const [prompt, setPrompt] = useState('')
-  const [articleId, setArticleId] = useState<number | undefined>()
-  const [articleTitle, setArticleTitle] = useState<string | undefined>()
-  const [counts, setCounts] = useState<Partial<Record<QuestionType, number>>>({})
-  const [difficulty, setDifficulty] = useState<Difficulty>('INTERMEDIATE')
-  const [tags, setTags] = useState<string[]>([])
-  const [category, setCategory] = useState<string>('')
-  const [modelId, setModelId] = useState<number | undefined>()
-  const [language, setLanguage] = useState<'zh' | 'en'>('zh')
-  const [dedupStrength, setDedupStrength] = useState<DedupStrength>('STANDARD')
+  const [prefill] = useState<GeneratePrefillState>(() => {
+    const state = (location.state as GeneratePrefillState | null) ?? {}
+    return {
+      ...state,
+      articleId: state.articleId ?? articleIdFromSearch(location.search),
+    }
+  })
+  const [prompt, setPrompt] = useState(prefill.prompt ?? '')
+  const [articleId, setArticleId] = useState<number | undefined>(prefill.articleId)
+  const [articleTitle, setArticleTitle] = useState<string | undefined>(prefill.articleTitle)
+  const [counts, setCounts] = useState<Partial<Record<QuestionType, number>>>(() =>
+    prefill.counts ? clampCounts(prefill.counts) : {},
+  )
+  const [countsTouched, setCountsTouched] = useState(false)
+  const migratedLegacy = useRef(false)
+  const toastedPrefill = useRef(false)
+  const [difficulty, setDifficulty] = useState<Difficulty>(prefill.difficulty ?? 'ADVANCED')
+  const [tags, setTags] = useState<string[]>(prefill.tags ?? [])
+  const [category, setCategory] = useState<string>(prefill.category ?? '')
+  const [modelId, setModelId] = useState<number | undefined>(prefill.modelProfileId)
+  const [language, setLanguage] = useState<'zh' | 'en'>(
+    prefill.language === 'en' || prefill.language === 'zh' ? prefill.language : 'zh',
+  )
+  const [dedupStrength, setDedupStrength] = useState<DedupStrength>(prefill.dedupStrength ?? 'STANDARD')
   /** 生成试卷时是否自动优化提示词；默认开。点「优化描述」后会关掉。 */
-  const [autoOptimize, setAutoOptimize] = useState(true)
+  const [autoOptimize, setAutoOptimize] = useState(prefill.autoOptimize ?? true)
   const [loadedPresetId, setLoadedPresetId] = useState<number | undefined>()
   const [saveOpen, setSaveOpen] = useState(false)
   const [saveName, setSaveName] = useState('')
   const [deleteOpen, setDeleteOpen] = useState(false)
 
-  // 预填（文章开卷 / 预览返回修改）：location.state，只消费一次
+  // 预填提示只打一次。articleId 同时写在 query 上，避免仅靠 location.state 丢失后组卷挂不上文章。
   useEffect(() => {
-    const state = location.state as GeneratePrefillState | null
-    if (!state) return
+    if (toastedPrefill.current) return
+    const state = prefill
     const hasPrefill =
       state.articleId != null ||
       state.prompt != null ||
@@ -131,20 +166,7 @@ export function GeneratePage() {
       state.autoOptimize != null ||
       state.fromJobId != null
     if (!hasPrefill) return
-
-    if (state.articleId != null) {
-      setArticleId(state.articleId)
-      setArticleTitle(state.articleTitle)
-    }
-    if (state.prompt != null) setPrompt(state.prompt)
-    if (state.category != null) setCategory(state.category)
-    if (state.counts) setCounts(state.counts)
-    if (state.difficulty) setDifficulty(state.difficulty)
-    if (state.tags) setTags(state.tags)
-    if (state.modelProfileId != null) setModelId(state.modelProfileId)
-    if (state.language === 'zh' || state.language === 'en') setLanguage(state.language)
-    if (state.dedupStrength) setDedupStrength(state.dedupStrength)
-    if (state.autoOptimize != null) setAutoOptimize(state.autoOptimize)
+    toastedPrefill.current = true
 
     if (state.summaryStale) {
       toast('考点摘要已过期，仍可出题；建议回到文章页重新提炼', { variant: 'warning', duration: 8000 })
@@ -155,10 +177,18 @@ export function GeneratePage() {
     } else if (state.tags && state.tags.length > 0) {
       toast(`已预填薄弱项「${state.tags.join('、')}」，可改参数后生成`, { variant: 'success' })
     }
-    navigate(location.pathname, { replace: true, state: null })
+    if (state.articleId != null && searchParams.get('articleId') !== String(state.articleId)) {
+      const next = new URLSearchParams(searchParams)
+      next.set('articleId', String(state.articleId))
+      setSearchParams(next, { replace: true })
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const countPreset = useMemo(
+    () => resolvedCountPreset(countPresetView?.counts),
+    [countPresetView],
+  )
   const total = QUESTION_TYPE_ORDER.reduce((s, t) => s + (counts[t] ?? 0), 0)
   const selectedModelId = modelId ?? defaultModel?.id
   const loadedPreset = (presets ?? []).find((p) => p.id === loadedPresetId)
@@ -173,7 +203,7 @@ export function GeneratePage() {
       const n = p.params.counts?.[t] ?? 0
       if (n > 0) nextCounts[t] = n
     }
-    setCounts(nextCounts)
+    setCounts(clampCounts(nextCounts))
     if (p.params.difficulty) setDifficulty(p.params.difficulty)
     setTags(p.params.tags ?? [])
     setCategory(p.params.category ?? '')
@@ -253,19 +283,63 @@ export function GeneratePage() {
       toast('优化失败', { variant: 'danger', description: (e as Error).message, duration: 10000 }),
   })
 
+  const saveCountPresetMut = useMutation({
+    mutationFn: (body: Partial<Record<QuestionType, number>>) => generationApi.saveCountPreset(body),
+    onSuccess: (view) => {
+      qc.setQueryData(['generation-count-preset'], view)
+      clearLegacyLocalPreset()
+      setCountsTouched(false)
+    },
+    onError: (e) =>
+      toast('保存失败', { variant: 'danger', description: (e as Error).message, duration: 8000 }),
+  })
+
+  useEffect(() => {
+    if (!countPresetView || migratedLegacy.current) return
+    migratedLegacy.current = true
+    const legacy = peekLegacyLocalPreset()
+    if (!legacy) return
+    if (countPresetView.saved) {
+      clearLegacyLocalPreset()
+      return
+    }
+    saveCountPresetMut.mutate(legacy)
+    // 仅在首次拿到服务端结果时迁一次旧 localStorage
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [countPresetView])
+
   const canSubmit =
-    prompt.trim().length > 0 && total > 0 && !!selectedModelId && !create.isPending && !optimize.isPending
+    prompt.trim().length > 0 &&
+    total > 0 &&
+    !!selectedModelId &&
+    !create.isPending &&
+    !optimize.isPending
+  const showSaveCountPreset = countsTouched && !countsEqual(counts, countPreset)
 
   const canOptimize =
     prompt.trim().length > 0 && !!selectedModelId && !optimize.isPending && !create.isPending
 
   function setCount(type: QuestionType, v: number) {
-    const clamped = Math.max(0, Math.min(30, v))
     setCounts((prev) => {
+      const clamped = Math.max(0, Math.min(MAX_QUESTIONS_PER_TYPE, v))
       const next = { ...prev }
       if (clamped === 0) delete next[type]
       else next[type] = clamped
       return next
+    })
+    setCountsTouched(true)
+  }
+
+  function applyCountPreset() {
+    setCounts({ ...countPreset })
+    setCountsTouched(false)
+    toast('已套用题型预设', { variant: 'success' })
+  }
+
+  function saveCountPreset() {
+    if (total === 0 || saveCountPresetMut.isPending) return
+    saveCountPresetMut.mutate(counts, {
+      onSuccess: () => toast('已保存为题型预设', { variant: 'success' }),
     })
   }
 
@@ -360,6 +434,11 @@ export function GeneratePage() {
               onClick={() => {
                 setArticleId(undefined)
                 setArticleTitle(undefined)
+                if (searchParams.has('articleId')) {
+                  const next = new URLSearchParams(searchParams)
+                  next.delete('articleId')
+                  setSearchParams(next, { replace: true })
+                }
               }}
             >
               取消关联
@@ -370,14 +449,16 @@ export function GeneratePage() {
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-sm font-medium">出题要求</h2>
             <div className="flex flex-wrap items-center gap-3">
-              <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <Switch
+                  id="generate-auto-optimize"
                   checked={autoOptimize}
                   onCheckedChange={setAutoOptimize}
-                  aria-label="自动优化"
                 />
-                <span>自动优化{autoOptimize ? '（开）' : '（关）'}</span>
-              </label>
+                <Label htmlFor="generate-auto-optimize" className="cursor-pointer text-xs font-normal text-muted-foreground">
+                  自动优化{autoOptimize ? '（开）' : '（关）'}
+                </Label>
+              </div>
               <Button
                 type="button"
                 size="sm"
@@ -414,15 +495,46 @@ export function GeneratePage() {
 
         {/* 题型与数量 */}
         <GlassCard>
-          <div className="mb-3 flex items-center justify-between gap-3">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-sm font-medium">题型与数量</h2>
-            <span
-              className={`rounded-lg px-2 py-0.5 text-xs font-medium ${
-                total === 0 || total > 30 ? 'bg-destructive/12 text-destructive' : 'bg-primary/12 text-primary'
-              }`}
-            >
-              共 {total} 题{total > 0 && total <= 30 && '（上限 30）'}
-            </span>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {showSaveCountPreset ? (
+                total === 0 ? (
+                  <Tooltip content="请先设置题型数量">
+                    <span className="inline-flex">
+                      <Button type="button" size="sm" variant="primary" disabled>
+                        <Save className="size-3.5" />
+                        保存预设
+                      </Button>
+                    </span>
+                  </Tooltip>
+                ) : (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="primary"
+                    loading={saveCountPresetMut.isPending}
+                    onClick={saveCountPreset}
+                    title="把当前题型数量保存到本机数据库"
+                  >
+                    {!saveCountPresetMut.isPending && <Save className="size-3.5" />}
+                    保存预设
+                  </Button>
+                )
+              ) : (
+                <Button type="button" size="sm" variant="primary" onClick={applyCountPreset}>
+                  <Bookmark className="size-3.5" />
+                  使用预设
+                </Button>
+              )}
+              <span
+                className={`rounded-lg px-2 py-0.5 text-xs font-medium tabular-nums ${
+                  total === 0 ? 'bg-destructive/12 text-destructive' : 'bg-primary/12 text-primary'
+                }`}
+              >
+                {total}
+              </span>
+            </div>
           </div>
           <div className="divide-y divide-border">
             {QUESTION_TYPE_ORDER.map((t) => {
@@ -433,7 +545,7 @@ export function GeneratePage() {
                   <Slider
                     className="min-w-0 flex-1"
                     min={0}
-                    max={30}
+                    max={MAX_QUESTIONS_PER_TYPE}
                     step={1}
                     value={[n]}
                     onValueChange={(v) => setCount(t, v[0] ?? 0)}

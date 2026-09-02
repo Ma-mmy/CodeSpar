@@ -39,6 +39,7 @@ import {
   useToast,
 } from '@/components/ui'
 import { Markdown } from '@/components/Markdown'
+import { QuestionOptions } from '@/components/QuestionOptions'
 import { DIFFICULTIES, QUESTION_TYPES } from '@/api/generation'
 import { modelsApi } from '@/api/models'
 import {
@@ -155,6 +156,7 @@ function QuestionBlock({
 
   const failed = !!q.errorMsg && !q.manualOverride
   const rate = q.fullScore > 0 && q.score != null ? q.score / q.fullScore : null
+  const hasOptions = !!q.options && q.options.length > 0
 
   return (
     <GlassCard>
@@ -233,9 +235,16 @@ function QuestionBlock({
         <div>
           <h4 className="mb-2 text-sm font-medium text-muted-foreground">题干</h4>
           <Markdown>{q.stem}</Markdown>
+          {hasOptions && q.options && (
+            <QuestionOptions
+              options={q.options}
+              userAnswer={q.userAnswer}
+              correctAnswer={q.correctAnswer}
+            />
+          )}
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
+        {!hasOptions && (
           <div>
             <h4 className="mb-2 text-sm font-medium text-muted-foreground">你的作答</h4>
             {q.userAnswer ? (
@@ -246,27 +255,33 @@ function QuestionBlock({
               <p className="text-sm text-muted-foreground">（未作答）</p>
             )}
           </div>
-          <div>
-            <h4 className="mb-2 text-sm font-medium text-muted-foreground">参考答案</h4>
-            {q.referenceAnswer || q.correctAnswer || q.explanation ? (
-              <div className="rounded-xl bg-black/4 p-3 dark:bg-white/6">
-                {q.correctAnswer && (
-                  <p className="mb-2 text-sm">
-                    <span className="text-muted-foreground">正确答案：</span>
-                    {q.correctAnswer}
-                  </p>
-                )}
-                {q.referenceAnswer && <Markdown>{q.referenceAnswer}</Markdown>}
-                {q.explanation && (
-                  <div className="mt-2 border-t border-border pt-2 text-sm text-muted-foreground">
-                    <Markdown>{q.explanation}</Markdown>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">—</p>
-            )}
-          </div>
+        )}
+
+        <div>
+          <h4 className="mb-2 text-sm font-medium text-muted-foreground">答案解析</h4>
+          {q.referenceAnswer || q.explanation || (q.correctAnswer && !hasOptions) ? (
+            <div className="rounded-xl bg-black/4 p-3 dark:bg-white/6">
+              {q.correctAnswer && !hasOptions && (
+                <p className="mb-2 text-sm">
+                  <span className="text-muted-foreground">正确答案：</span>
+                  {q.correctAnswer}
+                </p>
+              )}
+              {q.referenceAnswer && <Markdown>{q.referenceAnswer}</Markdown>}
+              {q.explanation && (
+                <div
+                  className={cn(
+                    q.referenceAnswer && 'mt-2 border-t border-border pt-2',
+                    'text-sm text-muted-foreground',
+                  )}
+                >
+                  <Markdown>{q.explanation}</Markdown>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">—</p>
+          )}
         </div>
 
         {q.rubricResult && q.rubricResult.length > 0 && (
@@ -291,15 +306,6 @@ function QuestionBlock({
                 </li>
               ))}
             </ul>
-          </div>
-        )}
-
-        {q.comment && (
-          <div>
-            <h4 className="mb-2 text-sm font-medium text-muted-foreground">点评</h4>
-            <div className="rounded-xl bg-primary/6 p-3 dark:bg-primary/10">
-              <Markdown>{q.comment}</Markdown>
-            </div>
           </div>
         )}
 

@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { Cpu, MessageSquareText, Tags } from 'lucide-react'
+import { Cpu, MessageSquareText, Shield, Tags } from 'lucide-react'
 import { PageContainer, PageHeader } from '@/components/ui'
 import { cn } from '@/lib/utils'
 
@@ -7,12 +7,13 @@ const TABS = [
   { to: '/settings/models', label: '模型管理', icon: Cpu, end: true },
   { to: '/settings/prompts', label: '系统提示词', icon: MessageSquareText },
   { to: '/settings/categories', label: '主分类', icon: Tags },
+  { to: '/settings/security', label: '安全', icon: Shield },
 ]
 
 export function SettingsLayout() {
   return (
     <PageContainer>
-      <PageHeader title="设置" description="管理模型、系统提示词与试卷主分类。" />
+      <PageHeader title="设置" description="管理模型、系统提示词、试卷主分类与访问口令。" />
       <div className="mb-5 flex flex-wrap gap-1 rounded-xl bg-black/5 p-1 dark:bg-white/5">
         {TABS.map(({ to, label, icon: Icon, end }) => (
           <NavLink

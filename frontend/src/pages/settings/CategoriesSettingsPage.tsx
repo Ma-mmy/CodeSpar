@@ -124,7 +124,7 @@ export function CategoriesSettingsPage() {
                   <Button type="button" size="sm" variant="ghost" onClick={() => openEdit(c)}>
                     <Pencil className="size-3.5" /> 编辑
                   </Button>
-                  {!c.builtin && c.id != null && (
+                  {c.id != null && (
                     <Button type="button" size="sm" variant="ghost" onClick={() => setPendingDelete(c)}>
                       <Trash2 className="size-3.5" />
                     </Button>
@@ -140,7 +140,7 @@ export function CategoriesSettingsPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{editor === 'new' ? '新建分类' : '编辑分类'}</DialogTitle>
-            <DialogDescription>编码可选；留空则按名称自动生成。内置分类不可改编码、不可删。</DialogDescription>
+            <DialogDescription>编码可选；留空则按名称自动生成。内置分类不可改编码。</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <Field label="名称" required>

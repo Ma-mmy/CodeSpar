@@ -17,6 +17,7 @@ export class ApiError extends Error {
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api${path}`, {
+    credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json', ...init?.headers },
     ...init,
   })
@@ -31,6 +32,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       }
     } catch {
       // 响应体不是 JSON，保留状态码文案
+    }
+    if (res.status === 401 && window.location.pathname !== '/unlock') {
+      const next = window.location.pathname + window.location.search + window.location.hash
+      window.location.assign(`/unlock?next=${encodeURIComponent(next)}`)
     }
     throw new ApiError(message, res.status, detail)
   }
@@ -53,7 +58,4 @@ export const api = {
 export interface HealthResponse {
   app: string
   status: string
-  db?: string
-  tables?: number
-  dbError?: string
 }

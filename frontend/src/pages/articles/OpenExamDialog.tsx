@@ -55,6 +55,8 @@ export function OpenExamDialog({
     queryKey: ['articles', article.id, 'exams'],
     queryFn: () => articlesApi.exams(article.id),
     enabled: open,
+    staleTime: 0,
+    refetchOnMount: 'always',
   })
 
   const refine = useMutation({
@@ -121,7 +123,7 @@ export function OpenExamDialog({
 
       const ctx = await articlesApi.openContext(article.id)
       onOpenChange(false)
-      navigate('/generate', {
+      navigate(`/generate?articleId=${ctx.articleId}`, {
         state: {
           articleId: ctx.articleId,
           articleTitle: ctx.title,
@@ -196,10 +198,15 @@ export function OpenExamDialog({
 
           <div>
             <h3 className="mb-2 text-sm font-medium">历史卷</h3>
+            <p className="mb-2 text-xs text-muted-foreground">只保留最近 3 套</p>
             {examsQ.isLoading ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="size-4 animate-spin" /> 加载中…
               </div>
+            ) : examsQ.isError ? (
+              <p className="text-sm text-destructive">
+                加载历史卷失败：{(examsQ.error as Error).message}
+              </p>
             ) : (examsQ.data ?? []).length === 0 ? (
               <p className="text-sm text-muted-foreground">该文章尚未开过卷</p>
             ) : (

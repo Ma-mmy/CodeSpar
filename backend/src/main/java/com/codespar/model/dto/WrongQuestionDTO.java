@@ -1,5 +1,6 @@
 package com.codespar.model.dto;
 
+import com.codespar.ai.QuestionBatchDTO;
 import com.codespar.model.enums.QuestionDifficulty;
 import com.codespar.model.enums.QuestionType;
 import jakarta.validation.constraints.NotNull;
@@ -27,6 +28,7 @@ public class WrongQuestionDTO {
         private QuestionType type;
         private QuestionDifficulty difficulty;
         private String stem;
+        private List<QuestionBatchDTO.Option> options;
         private String referenceAnswer;
         private String correctAnswer;
         private String explanation;
@@ -75,6 +77,7 @@ public class WrongQuestionDTO {
         private Boolean manualAdded;
         private LocalDateTime createdAt;
         private String stem;
+        private String optionsJson;
         private String type;
         private String difficulty;
         private Integer fullScore;

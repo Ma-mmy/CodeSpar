@@ -13,6 +13,7 @@ import com.codespar.model.entity.WrongQuestion;
 import com.codespar.model.enums.QuestionDifficulty;
 import com.codespar.model.enums.QuestionType;
 import com.codespar.web.ApiExceptionHandler.BizException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -36,8 +37,9 @@ public class WrongQuestionService {
     private final WrongQuestionMapper mapper;
     private final QuestionMapper questionMapper;
     private final ExamService examService;
+    private final QuestionConverter converter;
 
-    @Value("${codespar.generation.max-questions-per-exam:30}")
+    @Value("${codespar.generation.max-questions-per-exam:20}")
     private int maxQuestions;
 
     public ListView list(String status, String tag) {
@@ -156,6 +158,7 @@ public class WrongQuestionService {
         item.setType(QuestionType.from(r.getType()));
         item.setDifficulty(QuestionDifficulty.from(r.getDifficulty()));
         item.setStem(r.getStem());
+        item.setOptions(converter.parseList(r.getOptionsJson(), new TypeReference<>() {}));
         item.setReferenceAnswer(r.getReferenceAnswer());
         item.setCorrectAnswer(r.getCorrectAnswer());
         item.setExplanation(r.getExplanation());

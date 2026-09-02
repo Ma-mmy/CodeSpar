@@ -98,8 +98,9 @@ public class GenerationService {
     private final ConcurrentHashMap<Long, Boolean> cancelFlags = new ConcurrentHashMap<>();
     private final Semaphore concurrencyGate;
 
-    @Value("${codespar.generation.max-questions-per-exam:30}")
-    private int maxQuestions;
+    /** 每种题型一次最多出几道。整卷不再另设总数上限。 */
+    static final int MAX_QUESTIONS_PER_TYPE = 20;
+
     @Value("${codespar.generation.max-parse-retries:2}")
     private int maxParseRetries;
 
@@ -153,20 +154,7 @@ public class GenerationService {
 
     /** 创建出题任务并异步开跑，返回 jobId。 */
     public Long create(GenerateRequest req) {
-        int total = req.getCounts().values().stream()
-                .filter(Objects::nonNull).mapToInt(Integer::intValue).sum();
-        if (total <= 0) {
-            throw new BizException("请至少设置一种题型且数量大于 0");
-        }
-        if (total > maxQuestions) {
-            throw new BizException("一次出题最多 " + maxQuestions + " 道，当前 " + total + " 道");
-        }
-        for (var e : req.getCounts().entrySet()) {
-            int v = e.getValue() == null ? 0 : e.getValue();
-            if (v < 0) {
-                throw new BizException("题型数量不能为负数：" + e.getKey());
-            }
-        }
+        int total = validateCounts(req.getCounts());
         ModelProfile model = modelService.getRequired(req.getModelProfileId());
         if (!Boolean.TRUE.equals(model.getCanGenerate())) {
             throw new BizException("该模型未启用「可用于出题」，请到模型管理开启");
@@ -228,7 +216,7 @@ public class GenerationService {
         req.setPrompt(src.getPrompt());
         req.setCounts(params.getCounts() == null ? Map.of() : params.getCounts());
         req.setDifficulty(params.getDifficulty() == null
-                ? com.codespar.model.enums.QuestionDifficulty.INTERMEDIATE
+                ? com.codespar.model.enums.QuestionDifficulty.ADVANCED
                 : params.getDifficulty());
         req.setTags(params.getTags());
         String category = params.getCategory();
@@ -244,7 +232,7 @@ public class GenerationService {
                 ? DedupStrength.STANDARD
                 : params.getDedupStrength());
         req.setArticleId(src.getArticleId());
-        req.setAutoOptimize(params.getAutoOptimize() == null || Boolean.TRUE.equals(params.getAutoOptimize()));
+        req.setAutoOptimize(params.shouldAutoOptimize());
         return create(req);
     }
 
@@ -271,7 +259,7 @@ public class GenerationService {
         GenerateParams params = new GenerateParams();
         params.setCounts(req.getCounts() == null ? Map.of() : req.getCounts());
         params.setDifficulty(req.getDifficulty() == null
-                ? com.codespar.model.enums.QuestionDifficulty.INTERMEDIATE
+                ? com.codespar.model.enums.QuestionDifficulty.ADVANCED
                 : req.getDifficulty());
         params.setTags(req.getTags());
         params.setCategory(categoryCode);
@@ -468,6 +456,11 @@ public class GenerationService {
                     .orderByDesc(Exam::getId)
                     .last("LIMIT 1"));
             if (existing != null) {
+                if (existing.getArticleId() == null && job.getArticleId() != null) {
+                    examMapper.update(null, Wrappers.<Exam>lambdaUpdate()
+                            .eq(Exam::getId, existing.getId())
+                            .set(Exam::getArticleId, job.getArticleId()));
+                }
                 return existing.getId();
             }
             throw new BizException("没有可组卷的题目");
@@ -547,8 +540,7 @@ public class GenerationService {
             }
 
             // 1) 按需优化用户提示词；关闭自动优化时直接用原文（仍注入文章摘要）
-            boolean doOptimize = params.getAutoOptimize() == null || Boolean.TRUE.equals(params.getAutoOptimize());
-            String instruction = doOptimize
+            String instruction = params.shouldAutoOptimize()
                     ? optimizeUserPrompt(jobId, job, params, model, counters)
                     : skipOptimizeUserPrompt(jobId, job, counters);
             if (isCancelled(jobId)) {
@@ -696,7 +688,13 @@ public class GenerationService {
      * @return 落库后的 category code；失败返回 null（出题继续，不阻断）
      */
     private String classifyCategory(Long jobId, GenerationJob job, ChatModel model, Counters counters) {
-        hub.emit(jobId, "optimize_started", Map.of("message", "正在识别主分类…"));
+        hub.emit(jobId, "progress", Map.of(
+                "generated", counters.generated.get(),
+                "requested", job.getRequestedCount() == null ? 0 : job.getRequestedCount(),
+                "promptTokens", counters.promptTokens.get(),
+                "completionTokens", counters.completionTokens.get(),
+                "costMs", counters.costMs.get(),
+                "message", "正在识别主分类…"));
         long start = System.nanoTime();
         try {
             String prompt = promptBuilder.buildClassifyCategory(
@@ -734,7 +732,6 @@ public class GenerationService {
         String effective = withArticleSummary(
                 job.getPrompt() == null ? "" : job.getPrompt().trim(),
                 job.getArticleId());
-        hub.emit(jobId, "optimize_started", Map.of("message", "已跳过提示词优化"));
         GenerationJob update = new GenerationJob();
         update.setId(jobId);
         update.setOptimizedPrompt(effective);
@@ -748,6 +745,7 @@ public class GenerationService {
                 "promptTokens", counters.promptTokens.get(),
                 "completionTokens", counters.completionTokens.get(),
                 "costMs", counters.costMs.get()));
+        log.info("出题任务 {} 已跳过提示词优化", jobId);
         return effective;
     }
 
@@ -777,6 +775,31 @@ public class GenerationService {
         update.setCostMs(counters.costMs.get());
         jobMapper.updateById(update);
         hub.emit(jobId, "done", Map.of("status", "CANCELLED", "generated", counters.generated.get(), "errorMsg", ""));
+    }
+
+    /**
+     * 每种题型独立 0~{@link #MAX_QUESTIONS_PER_TYPE}，总数须大于 0。整卷不再另设总数上限。
+     */
+    static int validateCounts(Map<QuestionType, Integer> counts) {
+        if (counts == null || counts.isEmpty()) {
+            throw new BizException("请至少设置一种题型且数量大于 0");
+        }
+        int total = 0;
+        for (var e : counts.entrySet()) {
+            int v = e.getValue() == null ? 0 : e.getValue();
+            if (v < 0) {
+                throw new BizException("题型数量不能为负数：" + PromptBuilder.typeLabel(e.getKey()));
+            }
+            if (v > MAX_QUESTIONS_PER_TYPE) {
+                throw new BizException("每种题型最多 " + MAX_QUESTIONS_PER_TYPE + " 道，"
+                        + PromptBuilder.typeLabel(e.getKey()) + " 当前 " + v + " 道");
+            }
+            total += v;
+        }
+        if (total <= 0) {
+            throw new BizException("请至少设置一种题型且数量大于 0");
+        }
+        return total;
     }
 
     private static String buildCountsBlock(GenerateParams params) {

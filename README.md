@@ -65,10 +65,14 @@ cp .env.local.example .env.local
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
 | `CODESPAR_PORT` | `8099` | 应用端口 |
+| `CODESPAR_BIND` | `127.0.0.1` | 监听地址。公网请反代，不要直接绑 `0.0.0.0` |
 | `CODESPAR_DB_PATH` | `~/.codespar/codespar.db` | SQLite 数据库文件路径（首次启动自动创建） |
+| `CODESPAR_ACCESS_PASSWORD` | （空） | 默认访问口令，至少 8 位。设置页改过之后以本机哈希为准 |
 
 各家模型的 apiKey 不走配置文件，而是在应用内「模型管理」页录入，
 以 **AES-256-GCM 加密**存库，主密钥位于 `~/.codespar/master.key`（首次启动自动生成，权限 600）。
+
+本机开发不设口令即可使用。远程访问时在配置里写上默认 `CODESPAR_ACCESS_PASSWORD`（至少 8 位）再重启，打开站点先解锁；之后可在「设置 → 安全」修改，配置里的只当默认。建议前面加 HTTPS 反代，不要把 8099 直接暴露到公网。
 
 ## 实施进度
 

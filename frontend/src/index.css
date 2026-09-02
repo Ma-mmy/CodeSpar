@@ -2,6 +2,7 @@
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
+@custom-variant paper (&:is(.paper *));
 
 /* ==========================================================================
    设计系统：玻璃材质 + 柔和渐变背景 + 大圆角
@@ -41,6 +42,11 @@
   --glass-border: oklch(1 0 0 / 0.55);
   --glass-highlight: oklch(1 0 0 / 0.65);
   --glass-shadow: 0 8px 32px oklch(0.3 0.05 265 / 0.1), 0 2px 8px oklch(0.3 0.05 265 / 0.05);
+  /* 过滤值放变量里：生产压缩会把 blur() saturate() 粘成非法声明，毛玻璃在 8099 失效 */
+  --glass-filter: blur(20px) saturate(180%);
+  --glass-filter-strong: blur(32px) saturate(200%);
+  --glass-filter-mobile: blur(16px) saturate(170%);
+  --select-frost-filter: blur(16px);
 
   --chart-1: oklch(0.58 0.2 268);
   --chart-2: oklch(0.65 0.15 200);
@@ -86,6 +92,48 @@
   --chart-5: oklch(0.74 0.15 155);
 }
 
+/* 纸质护眼：电子墨水屏式亚光纸，无背光色块 */
+.paper {
+  --background: oklch(0.934 0.01 87.5); /* #ece9e2 */
+  --foreground: oklch(0.243 0.004 265); /* #1f2022 */
+
+  --card: oklch(0.962 0.008 87);
+  --card-foreground: oklch(0.243 0.004 265);
+  --popover: oklch(0.962 0.008 87);
+  --popover-foreground: oklch(0.243 0.004 265);
+
+  --primary: oklch(0.243 0.004 265);
+  --primary-foreground: oklch(0.934 0.01 87.5);
+  --secondary: oklch(0.9 0.012 85);
+  --secondary-foreground: oklch(0.243 0.004 265);
+  --muted: oklch(0.9 0.012 85);
+  --muted-foreground: oklch(0.544 0.004 248); /* #6e7072 */
+  --accent: oklch(0.88 0.014 85);
+  --accent-foreground: oklch(0.243 0.004 265);
+  --destructive: oklch(0.5 0.12 25);
+  --destructive-foreground: oklch(0.97 0.01 87);
+  --success: oklch(0.5 0.08 155);
+
+  --border: oklch(0.855 0.012 85); /* #d3cfc7 */
+  --input: oklch(0.855 0.012 85);
+  --ring: oklch(0.243 0.004 265 / 0.35);
+
+  --glass-bg: oklch(0.962 0.008 87 / 0.82);
+  --glass-border: oklch(0.855 0.012 85 / 0.9);
+  --glass-highlight: oklch(0.99 0.006 87 / 0.4);
+  --glass-shadow: 0 8px 28px oklch(0.24 0.004 265 / 0.08), 0 1px 4px oklch(0.24 0.004 265 / 0.05);
+  --glass-filter: blur(12px) saturate(120%);
+  --glass-filter-strong: blur(16px) saturate(130%);
+  --glass-filter-mobile: blur(10px) saturate(115%);
+  --select-frost-filter: blur(12px);
+
+  --chart-1: oklch(0.42 0.05 80);
+  --chart-2: oklch(0.48 0.04 200);
+  --chart-3: oklch(0.5 0.04 40);
+  --chart-4: oklch(0.55 0.05 85);
+  --chart-5: oklch(0.46 0.04 155);
+}
+
 @theme inline {
   --radius-sm: calc(var(--radius) - 8px);
   --radius-md: calc(var(--radius) - 4px);
@@ -127,8 +175,8 @@
    saturate 让透过玻璃的颜色更鲜活，而不是灰蒙蒙一片） */
 @utility glass {
   background-color: var(--glass-bg);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow), inset 0 1px 0 0 var(--glass-highlight);
 }
@@ -136,10 +184,24 @@
 /* 更强的模糊，用于悬浮层（侧边栏、抽屉、顶栏） */
 @utility glass-strong {
   background-color: color-mix(in oklch, var(--glass-bg) 100%, var(--background) 25%);
-  backdrop-filter: blur(32px) saturate(200%);
-  -webkit-backdrop-filter: blur(32px) saturate(200%);
+  -webkit-backdrop-filter: var(--glass-filter-strong);
+  backdrop-filter: var(--glass-filter-strong);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow), inset 0 1px 0 0 var(--glass-highlight);
+}
+
+/*
+  下拉菜单的毛玻璃衬底。Radix popper 用 transform 定位，菜单自己的
+  backdrop-filter 糊不到页面；这块层 position:fixed、无 transform，专门糊底下的字。
+*/
+.select-frost {
+  pointer-events: none;
+  position: fixed;
+  z-index: 50;
+  border-radius: var(--radius-xl);
+  background-color: color-mix(in oklch, var(--background) 10%, transparent);
+  -webkit-backdrop-filter: var(--select-frost-filter);
+  backdrop-filter: var(--select-frost-filter);
 }
 
 /* 可交互玻璃卡片的悬停态 */
@@ -188,6 +250,35 @@
   animation: accordion-up 0.22s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
+/* 仪表盘「最弱知识点」：首次进入时卡片浮入、圆环从 0 画到得分率 */
+@keyframes weak-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes weak-ring-draw {
+  from {
+    stroke-dashoffset: var(--weak-ring-c);
+  }
+  to {
+    stroke-dashoffset: var(--weak-ring-offset);
+  }
+}
+
+@utility animate-weak-card-in {
+  animation: weak-card-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) var(--weak-delay, 0ms) both;
+}
+
+@utility animate-weak-ring {
+  animation: weak-ring-draw 1.15s cubic-bezier(0.22, 1, 0.36, 1) calc(var(--weak-delay, 0ms) + 120ms) both;
+}
+
 /* --------------------------------------------------------------------------
    Markdown 正文样式（题干 / 参考答案 / 点评）
    -------------------------------------------------------------------------- */
@@ -196,6 +287,9 @@
   font-size: 0.875rem;
   line-height: 1.75;
   color: var(--foreground);
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .markdown-body > :first-child {
@@ -244,11 +338,16 @@
   padding: 0.15em 0.35em;
   border-radius: 6px;
   background: color-mix(in oklch, var(--foreground) 8%, transparent);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 .markdown-body pre {
   margin: 0.75em 0;
   padding: 0.75em 1em;
   overflow-x: auto;
+  /* 默认 pre 不换行，长提示词会把 grid 卡片撑出视口 */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
   border-radius: 0.75rem;
   background: color-mix(in oklch, var(--foreground) 6%, transparent);
   border: 1px solid var(--border);
@@ -258,6 +357,8 @@
   background: transparent;
   font-size: 0.82em;
   line-height: 1.6;
+  white-space: inherit;
+  word-break: inherit;
 }
 .markdown-body blockquote {
   margin: 0.75em 0;
@@ -266,10 +367,17 @@
   color: var(--muted-foreground);
 }
 .markdown-body table {
+  display: block;
   width: 100%;
+  max-width: 100%;
   margin: 0.75em 0;
   border-collapse: collapse;
   font-size: 0.85em;
+  overflow-x: auto;
+}
+.markdown-body img {
+  max-width: 100%;
+  height: auto;
 }
 .markdown-body th,
 .markdown-body td {
@@ -321,12 +429,16 @@
       radial-gradient(40rem 34rem at 82% 52%, oklch(0.5 0.16 168 / 0.3), transparent 66%);
   }
 
+  .paper body {
+    background-image: none;
+  }
+
   /* 移动端：backdrop-filter 层层叠加很吃 GPU，降低模糊半径保帧率 */
   @media (max-width: 768px) {
     .glass,
     .glass-strong {
-      backdrop-filter: blur(16px) saturate(170%);
-      -webkit-backdrop-filter: blur(16px) saturate(170%);
+      -webkit-backdrop-filter: var(--glass-filter-mobile);
+      backdrop-filter: var(--glass-filter-mobile);
     }
   }
 

@@ -154,7 +154,7 @@ public class PromptPresetService {
     private Params normalizeParams(Params in) {
         Params p = in == null ? new Params() : in;
         if (p.getDifficulty() == null) {
-            p.setDifficulty(QuestionDifficulty.INTERMEDIATE);
+            p.setDifficulty(QuestionDifficulty.ADVANCED);
         }
         if (p.getLanguage() == null || p.getLanguage().isBlank()) {
             p.setLanguage("zh");

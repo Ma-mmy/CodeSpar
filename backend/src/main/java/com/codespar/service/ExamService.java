@@ -297,6 +297,51 @@ public class ExamService {
         return getForTaking(exam.getId());
     }
 
+    /**
+     * 从已有题目组卷（错题本 / 题库挑题）。零成本，不调模型。
+     */
+    @Transactional
+    public ExamDetail composeFromQuestions(String name, String source, String category, List<Long> questionIds) {
+        if (questionIds == null || questionIds.isEmpty()) {
+            throw new BizException("没有可组卷的题目");
+        }
+        List<Long> ids = questionIds.stream().distinct().toList();
+        if (ids.size() > 30) {
+            throw new BizException("单次组卷不超过 30 题");
+        }
+        Map<Long, Question> byId = new HashMap<>();
+        for (Question q : questionMapper.selectBatchIds(ids)) {
+            byId.put(q.getId(), q);
+        }
+        List<Question> ordered = new ArrayList<>();
+        for (Long id : ids) {
+            Question q = byId.get(id);
+            if (q == null) {
+                throw new BizException("题目不存在：" + id);
+            }
+            ordered.add(q);
+        }
+
+        Exam exam = new Exam();
+        exam.setName(name == null || name.isBlank() ? "组卷" : name.trim());
+        exam.setCategory(category);
+        exam.setSource(source == null || source.isBlank() ? "MANUAL" : source);
+        exam.setStatus("NOT_STARTED");
+        exam.setQuestionCount(ordered.size());
+        exam.setFullScore(ordered.stream().mapToInt(q -> q.getFullScore() == null ? 0 : q.getFullScore()).sum());
+        examMapper.insert(exam);
+
+        int seq = 1;
+        for (Question q : ordered) {
+            ExamQuestion eq = new ExamQuestion();
+            eq.setExamId(exam.getId());
+            eq.setQuestionId(q.getId());
+            eq.setSeq(seq++);
+            examQuestionMapper.insert(eq);
+        }
+        return getForTaking(exam.getId());
+    }
+
     private ExamListItem toListItem(Exam e) {
         ExamListItem v = new ExamListItem();
         v.setId(e.getId());

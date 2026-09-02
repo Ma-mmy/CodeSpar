@@ -11,7 +11,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * 错题本条目。阅卷完成后得分率低于阈值自动入库（完整错题本 UI 留到 Step 2）。
+ * 错题本条目。阅卷完成后得分率低于阈值自动入库；也可手动加入。
  * <p>status: ACTIVE / MASTERED
  */
 @Data

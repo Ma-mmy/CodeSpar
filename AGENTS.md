@@ -10,7 +10,6 @@ Grok 每次启动都会读本文件。只写**代码里看不出来、且会反�
 - 本地单人，数据在本机 SQLite，不上账号体系
 - 题型：问答 / 系统设计 / 选择判断 / 填空；**不做**代码题和沙箱
 - 仅整卷模考，不做成刷单题
-- 模型接入走 OpenAI 兼容（baseURL + apiKey + model）。禁止按厂商写 if-else；DashScope 是唯一的独立 `ChatModelProvider`
 - 不要引入 Spring AI Graph / 多智能体编排，除非用户明确要做陪审团阅卷
 
 ## 命令

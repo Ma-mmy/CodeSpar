@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties } from 'react'
+import { useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
@@ -245,7 +245,17 @@ export function Dashboard() {
               label="做题数"
               value={`${totals.gradedQuestionCount}`}
               hint={
-                totals.wrongQuestionCount > 0 ? `错题本 ${totals.wrongQuestionCount} 道` : '含重刷'
+                totals.wrongQuestionCount > 0 ? (
+                  <button
+                    type="button"
+                    className="underline hover:text-foreground"
+                    onClick={() => navigate('/wrong-book')}
+                  >
+                    错题本 {totals.wrongQuestionCount} 道
+                  </button>
+                ) : (
+                  '含重刷'
+                )
               }
             />
             <StatCard
@@ -464,7 +474,7 @@ function StatCard({
   icon: typeof FileText
   label: string
   value: string
-  hint: string
+  hint: ReactNode
   valueClass?: string
 }) {
   return (

@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   CircleDashed,
   Loader2,
+  BookMarked,
   Pencil,
   RefreshCw,
   RotateCcw,
@@ -49,6 +50,7 @@ import {
   type RubricHitStatus,
 } from '@/api/gradings'
 import { examsApi } from '@/api/exams'
+import { wrongBookApi } from '@/api/wrongBook'
 
 const HIT_LABEL: Record<RubricHitStatus, string> = {
   HIT: '命中',
@@ -101,6 +103,7 @@ function QuestionBlock({
   onChanged: () => void
 }) {
   const toast = useToast()
+  const qc = useQueryClient()
   const [overrideOpen, setOverrideOpen] = useState(false)
   const [score, setScore] = useState(String(q.score ?? 0))
   const [reason, setReason] = useState(q.overrideReason ?? '')
@@ -126,6 +129,28 @@ function QuestionBlock({
       onChanged()
     },
     onError: (e) => toast('覆盖失败', { variant: 'danger', description: (e as Error).message }),
+  })
+
+  const addWrong = useMutation({
+    mutationFn: () => wrongBookApi.add(q.questionId),
+    onSuccess: () => {
+      toast('已加入错题本', { variant: 'success' })
+      qc.invalidateQueries({ queryKey: ['wrong-book'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+      onChanged()
+    },
+    onError: (e) => toast('加入失败', { variant: 'danger', description: (e as Error).message }),
+  })
+
+  const removeWrong = useMutation({
+    mutationFn: () => wrongBookApi.removeByQuestion(q.questionId),
+    onSuccess: () => {
+      toast('已移出错题本', { variant: 'success' })
+      qc.invalidateQueries({ queryKey: ['wrong-book'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+      onChanged()
+    },
+    onError: (e) => toast('移出失败', { variant: 'danger', description: (e as Error).message }),
   })
 
   const failed = !!q.errorMsg && !q.manualOverride
@@ -185,6 +210,22 @@ function QuestionBlock({
               改分
             </Button>
           )}
+          {!gradingRunning &&
+            (q.inWrongBook ? (
+              <Button
+                variant="outline"
+                size="sm"
+                loading={removeWrong.isPending}
+                onClick={() => removeWrong.mutate()}
+              >
+                移出错题本
+              </Button>
+            ) : (
+              <Button variant="outline" size="sm" loading={addWrong.isPending} onClick={() => addWrong.mutate()}>
+                <BookMarked />
+                加入错题本
+              </Button>
+            ))}
         </div>
       </div>
 

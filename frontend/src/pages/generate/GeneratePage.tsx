@@ -1,18 +1,28 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Sparkles, Wand2 } from 'lucide-react'
 import {
   Alert,
+  Badge,
   Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
   Field,
   GlassCard,
+  Input,
   OptionCard,
   PageContainer,
   PageHeader,
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
   Skeleton,
@@ -36,6 +46,7 @@ import {
   type QuestionType,
 } from '@/api/generation'
 import { categoriesApi } from '@/api/categories'
+import { presetsApi, type PromptPreset } from '@/api/presets'
 import { TagInput } from './TagInput'
 
 const DIFFICULTY_ORDER: Difficulty[] = ['BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'EXPERT']
@@ -61,6 +72,7 @@ export function GeneratePage() {
   const navigate = useNavigate()
   const location = useLocation()
   const toast = useToast()
+  const qc = useQueryClient()
 
   const { data: models, isLoading: modelsLoading } = useQuery({
     queryKey: ['models'],
@@ -73,6 +85,10 @@ export function GeneratePage() {
   const { data: categories } = useQuery({
     queryKey: ['categories'],
     queryFn: categoriesApi.list,
+  })
+  const { data: presets } = useQuery({
+    queryKey: ['presets'],
+    queryFn: presetsApi.list,
   })
 
   const generateModels = useMemo(
@@ -93,6 +109,10 @@ export function GeneratePage() {
   const [dedupStrength, setDedupStrength] = useState<DedupStrength>('STANDARD')
   /** 生成试卷时是否自动优化提示词；默认开。点「优化描述」后会关掉。 */
   const [autoOptimize, setAutoOptimize] = useState(true)
+  const [loadedPresetId, setLoadedPresetId] = useState<number | undefined>()
+  const [saveOpen, setSaveOpen] = useState(false)
+  const [saveName, setSaveName] = useState('')
+  const [deleteOpen, setDeleteOpen] = useState(false)
 
   // 预填（文章开卷 / 预览返回修改）：location.state，只消费一次
   useEffect(() => {
@@ -141,6 +161,64 @@ export function GeneratePage() {
 
   const total = QUESTION_TYPE_ORDER.reduce((s, t) => s + (counts[t] ?? 0), 0)
   const selectedModelId = modelId ?? defaultModel?.id
+  const loadedPreset = (presets ?? []).find((p) => p.id === loadedPresetId)
+  const builtinPresets = (presets ?? []).filter((p) => p.builtin)
+  const customPresets = (presets ?? []).filter((p) => !p.builtin)
+
+  function applyPreset(p: PromptPreset) {
+    setLoadedPresetId(p.id)
+    setPrompt(p.prompt)
+    const nextCounts: Partial<Record<QuestionType, number>> = {}
+    for (const t of QUESTION_TYPE_ORDER) {
+      const n = p.params.counts?.[t] ?? 0
+      if (n > 0) nextCounts[t] = n
+    }
+    setCounts(nextCounts)
+    if (p.params.difficulty) setDifficulty(p.params.difficulty)
+    setTags(p.params.tags ?? [])
+    setCategory(p.params.category ?? '')
+    if (p.params.language === 'en' || p.params.language === 'zh') setLanguage(p.params.language)
+    if (p.params.dedupStrength) setDedupStrength(p.params.dedupStrength)
+    toast(`已载入「${p.name}」`, { variant: 'success' })
+  }
+
+  const savePreset = useMutation({
+    mutationFn: () =>
+      presetsApi.create({
+        name: saveName.trim(),
+        prompt: prompt.trim(),
+        params: {
+          counts: Object.fromEntries(
+            QUESTION_TYPE_ORDER.filter((t) => (counts[t] ?? 0) > 0).map((t) => [t, counts[t]]),
+          ),
+          difficulty,
+          tags: tags.map((t) => t.trim()).filter(Boolean),
+          category: category || undefined,
+          language,
+          dedupStrength,
+        },
+      }),
+    onSuccess: (p) => {
+      setSaveOpen(false)
+      setSaveName('')
+      setLoadedPresetId(p.id)
+      qc.invalidateQueries({ queryKey: ['presets'] })
+      toast('已保存为预设', { variant: 'success' })
+    },
+    onError: (e) =>
+      toast('保存失败', { variant: 'danger', description: (e as Error).message, duration: 8000 }),
+  })
+
+  const deletePreset = useMutation({
+    mutationFn: (id: number) => presetsApi.remove(id),
+    onSuccess: () => {
+      setDeleteOpen(false)
+      setLoadedPresetId(undefined)
+      qc.invalidateQueries({ queryKey: ['presets'] })
+      toast('已删除预设', { variant: 'success' })
+    },
+    onError: (e) => toast('删除失败', { variant: 'danger', description: (e as Error).message }),
+  })
 
   const create = useMutation({
     mutationFn: (body: GenerateRequest) => generationApi.create(body),
@@ -218,6 +296,61 @@ export function GeneratePage() {
       />
 
       <div className="space-y-5">
+        <div className="flex flex-wrap items-center gap-2">
+          <Select
+            value={loadedPresetId != null ? String(loadedPresetId) : undefined}
+            onValueChange={(v) => {
+              const p = (presets ?? []).find((x) => x.id === Number(v))
+              if (p) applyPreset(p)
+            }}
+            disabled={!presets || presets.length === 0}
+          >
+            <SelectTrigger className="w-56">
+              <SelectValue placeholder="载入预设" />
+            </SelectTrigger>
+            <SelectContent>
+              {builtinPresets.length > 0 && (
+                <SelectGroup>
+                  <SelectLabel>内置</SelectLabel>
+                  {builtinPresets.map((p) => (
+                    <SelectItem key={p.id} value={String(p.id)}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              )}
+              {customPresets.length > 0 && (
+                <SelectGroup>
+                  <SelectLabel>我的</SelectLabel>
+                  {customPresets.map((p) => (
+                    <SelectItem key={p.id} value={String(p.id)}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              )}
+            </SelectContent>
+          </Select>
+          {loadedPreset?.builtin && <Badge variant="neutral">内置</Badge>}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={!prompt.trim()}
+            onClick={() => {
+              setSaveName(loadedPreset && !loadedPreset.builtin ? loadedPreset.name : '')
+              setSaveOpen(true)
+            }}
+          >
+            另存为
+          </Button>
+          {loadedPreset && !loadedPreset.builtin && (
+            <Button type="button" variant="ghost" size="sm" onClick={() => setDeleteOpen(true)}>
+              删除预设
+            </Button>
+          )}
+        </div>
+
         {articleId != null && (
           <Alert variant="info" title="已关联文章">
             将基于「{articleTitle ?? articleId}」的考点摘要出题（摘要由服务端注入，无需粘贴全文）。
@@ -467,6 +600,62 @@ export function GeneratePage() {
           )}
         </div>
       </div>
+
+      <Dialog open={saveOpen} onOpenChange={setSaveOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>另存为预设</DialogTitle>
+            <DialogDescription>保存当前提示词、题型数量、难度、标签、分类、语言与去重。</DialogDescription>
+          </DialogHeader>
+          <Field label="名称" required>
+            {(id) => (
+              <Input
+                id={id}
+                value={saveName}
+                onChange={(e) => setSaveName(e.target.value)}
+                placeholder="例如：RAG 故障排查专项"
+                maxLength={80}
+              />
+            )}
+          </Field>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setSaveOpen(false)}>
+              取消
+            </Button>
+            <Button
+              variant="primary"
+              loading={savePreset.isPending}
+              disabled={!saveName.trim() || !prompt.trim()}
+              onClick={() => savePreset.mutate()}
+            >
+              保存
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>删除这个预设？</DialogTitle>
+            <DialogDescription>
+              {loadedPreset ? `将删除「${loadedPreset.name}」。表单内容仍保留。` : '将删除当前载入的用户预设。'}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setDeleteOpen(false)}>
+              取消
+            </Button>
+            <Button
+              variant="outline"
+              loading={deletePreset.isPending}
+              onClick={() => loadedPreset && deletePreset.mutate(loadedPreset.id)}
+            >
+              确认删除
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageContainer>
   )
 }

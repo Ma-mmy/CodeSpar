@@ -11,6 +11,7 @@ import { ReportPage } from '@/pages/exams/ReportPage'
 import { GenerationsHistoryPage } from '@/pages/history/GenerationsHistoryPage'
 import { GradingsHistoryPage } from '@/pages/history/GradingsHistoryPage'
 import { ArticlesPage } from '@/pages/articles/ArticlesPage'
+import { WrongBookPage } from '@/pages/wrong-book/WrongBookPage'
 import { SettingsLayout } from '@/pages/settings/SettingsPage'
 import { PromptsSettingsPage } from '@/pages/settings/PromptsSettingsPage'
 import { CategoriesSettingsPage } from '@/pages/settings/CategoriesSettingsPage'
@@ -41,6 +42,7 @@ export default function App() {
                 <Route path="articles" element={<ArticlesPage />} />
                 <Route path="generate" element={<GeneratePage />} />
                 <Route path="generate/:jobId" element={<GenerateRunPage />} />
+                <Route path="wrong-book" element={<WrongBookPage />} />
                 <Route path="exams" element={<ExamsPage />} />
                 <Route path="exams/:id/take" element={<TakeExamPage />} />
                 <Route path="exams/:id/report" element={<ReportPage />} />

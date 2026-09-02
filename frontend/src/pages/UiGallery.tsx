@@ -34,6 +34,7 @@ import {
   SelectValue,
   Separator,
   Skeleton,
+  Slider,
   Switch,
   Table,
   TableBody,
@@ -67,6 +68,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 export function UiGallery() {
   const toast = useToast()
   const [progress, setProgress] = useState(42)
+  const [slider, setSlider] = useState(8)
 
   return (
     <PageContainer>
@@ -213,7 +215,7 @@ export function UiGallery() {
         </div>
       </Section>
 
-      <Section title="进度 / 骨架屏 / 空状态">
+      <Section title="进度 / 滑块 / 骨架屏 / 空状态">
         <div className="space-y-3">
           <Progress value={progress} />
           <div className="flex gap-2">
@@ -224,6 +226,18 @@ export function UiGallery() {
               +20
             </Button>
           </div>
+        </div>
+        <div className="mt-5 flex items-center gap-3">
+          <Slider
+            className="flex-1"
+            min={0}
+            max={30}
+            step={1}
+            value={[slider]}
+            onValueChange={(v) => setSlider(v[0] ?? 0)}
+            aria-label="示例数量"
+          />
+          <span className="w-8 text-right text-sm tabular-nums">{slider}</span>
         </div>
         <div className="mt-5 space-y-2">
           <Skeleton className="h-4 w-2/3" />

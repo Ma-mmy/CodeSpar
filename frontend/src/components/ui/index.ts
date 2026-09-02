@@ -17,6 +17,7 @@ export {
   SelectValue,
 } from './select'
 export { Checkbox, OptionCard, RadioGroup, RadioGroupItem, Switch } from './toggles'
+export { Slider } from './slider'
 export {
   Alert,
   Badge,

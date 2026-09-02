@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Minus, Plus, Sparkles, Wand2 } from 'lucide-react'
+import { Sparkles, Wand2 } from 'lucide-react'
 import {
   Alert,
   Button,
@@ -16,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
   Skeleton,
+  Slider,
   Switch,
   Textarea,
   Tooltip,
@@ -291,32 +292,30 @@ export function GeneratePage() {
             </span>
           </div>
           <div className="divide-y divide-border">
-            {QUESTION_TYPE_ORDER.map((t) => (
-              <div key={t} className="flex items-center justify-between gap-3 py-2.5">
-                <span className="text-sm">{QUESTION_TYPES[t]}</span>
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="icon-sm"
-                    variant="outline"
-                    aria-label={`减少${QUESTION_TYPES[t]}`}
-                    disabled={(counts[t] ?? 0) <= 0}
-                    onClick={() => setCount(t, (counts[t] ?? 0) - 1)}
+            {QUESTION_TYPE_ORDER.map((t) => {
+              const n = counts[t] ?? 0
+              return (
+                <div key={t} className="flex items-center gap-3 py-3.5">
+                  <span className="w-20 shrink-0 text-sm">{QUESTION_TYPES[t]}</span>
+                  <Slider
+                    className="min-w-0 flex-1"
+                    min={0}
+                    max={30}
+                    step={1}
+                    value={[n]}
+                    onValueChange={(v) => setCount(t, v[0] ?? 0)}
+                    aria-label={`${QUESTION_TYPES[t]}数量`}
+                  />
+                  <span
+                    className={`w-8 shrink-0 text-right text-sm tabular-nums ${
+                      n > 0 ? 'font-medium text-primary' : 'text-muted-foreground'
+                    }`}
                   >
-                    <Minus />
-                  </Button>
-                  <span className="w-8 text-center text-sm tabular-nums">{counts[t] ?? 0}</span>
-                  <Button
-                    size="icon-sm"
-                    variant="outline"
-                    aria-label={`增加${QUESTION_TYPES[t]}`}
-                    disabled={(counts[t] ?? 0) >= 30}
-                    onClick={() => setCount(t, (counts[t] ?? 0) + 1)}
-                  >
-                    <Plus />
-                  </Button>
+                    {n}
+                  </span>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </GlassCard>
 

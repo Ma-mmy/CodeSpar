@@ -1,0 +1,89 @@
+server:
+  # 端口可被 .env.local 的 CODESPAR_PORT 覆盖（config.import 已自动加载）
+  port: ${CODESPAR_PORT:8099}
+
+spring:
+  application:
+    name: codespar
+
+  # 自动加载项目根目录的 .env.local —— IDEA / 裸 java -jar 直接启动时也能读到
+  # DB 密码等本地配置，不必在 IDEA 运行配置里手动加环境变量。
+  # 脚本（start.sh/dev.sh）会用环境变量 / 命令行参数以更高优先级覆盖这里。
+  config:
+    import: optional:file:../.env.local[.properties],optional:file:.env.local[.properties]
+
+  # JDK 21 虚拟线程：出题/阅卷是典型 IO 密集（等 LLM 响应），虚拟线程收益明显
+  threads:
+    virtual:
+      enabled: true
+
+  datasource:
+    # SQLite 单文件数据库（本地单人应用零部署）。URL 参数：
+    # journal_mode=WAL 减少读写互斥；busy_timeout 等待锁而非立刻报错；foreign_keys 开启外键约束
+    # 注意：SQLite 同时只能有一个写者。出题分批并发 + 连接池>1 会触发 SQLITE_BUSY / BUSY_SNAPSHOT，
+    # 表现为「确认组卷」或保存草稿时报 UncategorizedSQLException。因此池大小必须为 1。
+    url: jdbc:sqlite:${CODESPAR_DB_PATH:${user.home}/.codespar/codespar.db}?journal_mode=WAL&busy_timeout=30000&foreign_keys=on
+    driver-class-name: org.sqlite.JDBC
+    hikari:
+      maximum-pool-size: 1
+      minimum-idle: 1
+      connection-init-sql: PRAGMA busy_timeout = 30000
+      # SQLite 是单写者，首连推迟到目录初始化组件建好 ~/.codespar 之后再连
+      initialization-fail-timeout: -1
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+
+  # ------------------------------------------------------------------
+  # 下面这两段是给 Spring AI 自动配置的"哑值"，仅为让上下文能正常启动。
+  # CodeSpar 不使用自动装配的 ChatModel Bean —— 模型配置存在数据库里、
+  # 由用户在 UI 上随时增删，实际的 ChatModel 由 ChatModelFactory 在运行时构造。
+  # ------------------------------------------------------------------
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY:unused-configured-at-runtime}
+      base-url: https://api.openai.com
+    dashscope:
+      api-key: ${DASHSCOPE_API_KEY:unused-configured-at-runtime}
+
+  servlet:
+    multipart:
+      max-file-size: 256KB
+      max-request-size: 512KB
+
+  web:
+    resources:
+      # 前端构建产物由 build.sh 拷入 static/
+      static-locations: classpath:/static/
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: auto
+  mapper-locations: classpath*:/mapper/**/*.xml
+
+codespar:
+  http:
+    connect-timeout-sec: 15
+    read-timeout-sec: 180       # LLM 出题一批可能跑一两分钟
+  crypto:
+    # AES-256-GCM 主密钥；首次启动自动生成，权限 600
+    master-key-file: ${user.home}/.codespar/master.key
+  generation:
+    max-questions-per-exam: 30
+    batch-concurrency: 4        # 按题型分批的并发数
+    max-parse-retries: 2        # JSON 解析失败的回灌重试次数
+  grading:
+    concurrency: 3              # 主观题阅卷并发（prompt 较长，别开太大）
+    wrong-book-threshold: 0.6   # 得分率低于此值自动进错题本
+  dashboard:
+    min-tag-sample: 3           # 弱项排行：少于此题量标「样本不足」
+
+logging:
+  level:
+    com.codespar: INFO
+    org.springframework.ai: INFO

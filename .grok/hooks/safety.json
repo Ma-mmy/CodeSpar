@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|run_terminal_command",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .grok/hooks/deny-destructive.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

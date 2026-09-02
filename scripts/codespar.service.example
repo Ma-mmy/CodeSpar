@@ -1,0 +1,45 @@
+# systemd 单元示例
+#
+# 1. 上传 jar 到 /opt/codespar/codespar.jar
+# 2. 上传 scripts/run-server.sh 到 /opt/codespar/run-server.sh 并 chmod +x
+# 3. 创建用户与数据目录：
+#      sudo useradd -r -s /usr/sbin/nologin codespar
+#      sudo mkdir -p /opt/codespar /var/lib/codespar
+#      sudo chown -R codespar:codespar /opt/codespar /var/lib/codespar
+# 4. 安装本单元：
+#      sudo cp scripts/codespar.service.example /etc/systemd/system/codespar.service
+#      sudo systemctl daemon-reload
+#      sudo systemctl enable --now codespar
+# 5. 前面建议用 Nginx 反代 127.0.0.1:8099 并做 HTTPS / 鉴权
+
+[Unit]
+Description=CodeSpar mock-exam service
+After=network.target
+
+[Service]
+Type=simple
+User=codespar
+Group=codespar
+WorkingDirectory=/opt/codespar
+
+# 优先读环境文件（把 .env.server.example 拷成这个路径后改）
+EnvironmentFile=-/var/lib/codespar/codespar.env
+
+Environment=CODESPAR_JAR=/opt/codespar/codespar.jar
+Environment=CODESPAR_PORT=8099
+Environment=CODESPAR_BIND=127.0.0.1
+Environment=CODESPAR_DB_PATH=/var/lib/codespar/codespar.db
+Environment=CODESPAR_MASTER_KEY_FILE=/var/lib/codespar/master.key
+# Environment=CODESPAR_MASTER_KEY=
+# Environment=CODESPAR_JAVA_OPTS=-Xms256m -Xmx1g
+
+ExecStart=/opt/codespar/run-server.sh
+Restart=on-failure
+RestartSec=5
+
+# 安全加固（可按发行版调整）
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

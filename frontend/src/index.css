@@ -1,0 +1,366 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ==========================================================================
+   设计系统：玻璃材质 + 柔和渐变背景 + 大圆角
+   ========================================================================== */
+
+:root {
+  /* 圆角基准调大，整体更圆润 */
+  --radius: 1rem;
+
+  --background: oklch(0.955 0.014 265);
+  --foreground: oklch(0.21 0.02 265);
+
+  /* card / popover 在玻璃语境下是"材质底色"，实际透明度由 .glass 控制 */
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.21 0.02 265);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.21 0.02 265);
+
+  --primary: oklch(0.54 0.19 268);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.94 0.012 265);
+  --secondary-foreground: oklch(0.28 0.03 265);
+  --muted: oklch(0.94 0.012 265);
+  --muted-foreground: oklch(0.52 0.02 265);
+  --accent: oklch(0.93 0.03 265);
+  --accent-foreground: oklch(0.3 0.05 268);
+  --destructive: oklch(0.58 0.22 25);
+  --destructive-foreground: oklch(0.99 0 0);
+  --success: oklch(0.62 0.15 155);
+
+  --border: oklch(0.28 0.02 265 / 0.1);
+  --input: oklch(0.28 0.02 265 / 0.12);
+  --ring: oklch(0.54 0.19 268 / 0.45);
+
+  /* 玻璃材质参数 */
+  --glass-bg: oklch(1 0 0 / 0.6);
+  --glass-border: oklch(1 0 0 / 0.55);
+  --glass-highlight: oklch(1 0 0 / 0.65);
+  --glass-shadow: 0 8px 32px oklch(0.3 0.05 265 / 0.1), 0 2px 8px oklch(0.3 0.05 265 / 0.05);
+
+  --chart-1: oklch(0.58 0.2 268);
+  --chart-2: oklch(0.65 0.15 200);
+  --chart-3: oklch(0.68 0.16 330);
+  --chart-4: oklch(0.72 0.16 85);
+  --chart-5: oklch(0.64 0.16 155);
+}
+
+.dark {
+  --background: oklch(0.16 0.02 265);
+  --foreground: oklch(0.96 0.005 265);
+
+  --card: oklch(0.24 0.025 265);
+  --card-foreground: oklch(0.96 0.005 265);
+  --popover: oklch(0.24 0.025 265);
+  --popover-foreground: oklch(0.96 0.005 265);
+
+  --primary: oklch(0.72 0.16 268);
+  --primary-foreground: oklch(0.17 0.03 265);
+  --secondary: oklch(1 0 0 / 0.1);
+  --secondary-foreground: oklch(0.96 0.005 265);
+  --muted: oklch(1 0 0 / 0.08);
+  --muted-foreground: oklch(0.72 0.02 265);
+  --accent: oklch(1 0 0 / 0.12);
+  --accent-foreground: oklch(0.96 0.005 265);
+  --destructive: oklch(0.7 0.19 22);
+  --destructive-foreground: oklch(0.17 0.03 265);
+  --success: oklch(0.72 0.16 158);
+
+  --border: oklch(1 0 0 / 0.12);
+  --input: oklch(1 0 0 / 0.16);
+  --ring: oklch(0.72 0.16 268 / 0.5);
+
+  --glass-bg: oklch(1 0 0 / 0.07);
+  --glass-border: oklch(1 0 0 / 0.14);
+  --glass-highlight: oklch(1 0 0 / 0.16);
+  --glass-shadow: 0 8px 32px oklch(0 0 0 / 0.35), 0 2px 8px oklch(0 0 0 / 0.2);
+
+  --chart-1: oklch(0.72 0.17 268);
+  --chart-2: oklch(0.75 0.14 200);
+  --chart-3: oklch(0.76 0.15 330);
+  --chart-4: oklch(0.8 0.15 85);
+  --chart-5: oklch(0.74 0.15 155);
+}
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 8px);
+  --radius-md: calc(var(--radius) - 4px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 6px);
+  --radius-2xl: calc(var(--radius) + 12px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+}
+
+/* --------------------------------------------------------------------------
+   玻璃材质工具类
+   -------------------------------------------------------------------------- */
+
+/* 标准玻璃面板：半透明 + 背景模糊 + 提高饱和度（苹果的关键一步，
+   saturate 让透过玻璃的颜色更鲜活，而不是灰蒙蒙一片） */
+@utility glass {
+  background-color: var(--glass-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 0 var(--glass-highlight);
+}
+
+/* 更强的模糊，用于悬浮层（侧边栏、抽屉、顶栏） */
+@utility glass-strong {
+  background-color: color-mix(in oklch, var(--glass-bg) 100%, var(--background) 25%);
+  backdrop-filter: blur(32px) saturate(200%);
+  -webkit-backdrop-filter: blur(32px) saturate(200%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow), inset 0 1px 0 0 var(--glass-highlight);
+}
+
+/* 可交互玻璃卡片的悬停态 */
+@utility glass-hover {
+  transition:
+    transform 0.2s cubic-bezier(0.32, 0.72, 0, 1),
+    box-shadow 0.2s cubic-bezier(0.32, 0.72, 0, 1),
+    background-color 0.2s ease;
+
+  &:hover {
+    transform: translateY(-2px);
+    background-color: color-mix(in oklch, var(--glass-bg) 100%, white 8%);
+    box-shadow:
+      0 16px 48px oklch(0.3 0.05 265 / 0.16),
+      inset 0 1px 0 0 var(--glass-highlight);
+  }
+}
+
+/* Accordion 展开/收起动画：Radix 会把内容实测高度写进 --radix-accordion-content-height */
+@keyframes accordion-down {
+  from {
+    height: 0;
+    opacity: 0;
+  }
+  to {
+    height: var(--radix-accordion-content-height);
+    opacity: 1;
+  }
+}
+@keyframes accordion-up {
+  from {
+    height: var(--radix-accordion-content-height);
+    opacity: 1;
+  }
+  to {
+    height: 0;
+    opacity: 0;
+  }
+}
+
+@utility animate-accordion-down {
+  animation: accordion-down 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@utility animate-accordion-up {
+  animation: accordion-up 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* --------------------------------------------------------------------------
+   Markdown 正文样式（题干 / 参考答案 / 点评）
+   -------------------------------------------------------------------------- */
+
+.markdown-body {
+  font-size: 0.875rem;
+  line-height: 1.75;
+  color: var(--foreground);
+}
+
+.markdown-body > :first-child {
+  margin-top: 0;
+}
+.markdown-body > :last-child {
+  margin-bottom: 0;
+}
+.markdown-body p {
+  margin: 0.5em 0;
+}
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4 {
+  font-weight: 600;
+  margin: 1em 0 0.4em;
+}
+.markdown-body h1 {
+  font-size: 1.125rem;
+}
+.markdown-body h2 {
+  font-size: 1rem;
+}
+.markdown-body h3,
+.markdown-body h4 {
+  font-size: 0.925rem;
+}
+.markdown-body ul,
+.markdown-body ol {
+  margin: 0.5em 0;
+  padding-left: 1.4em;
+}
+.markdown-body ul {
+  list-style: disc;
+}
+.markdown-body ol {
+  list-style: decimal;
+}
+.markdown-body li {
+  margin: 0.25em 0;
+}
+.markdown-body code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.82em;
+  padding: 0.15em 0.35em;
+  border-radius: 6px;
+  background: color-mix(in oklch, var(--foreground) 8%, transparent);
+}
+.markdown-body pre {
+  margin: 0.75em 0;
+  padding: 0.75em 1em;
+  overflow-x: auto;
+  border-radius: 0.75rem;
+  background: color-mix(in oklch, var(--foreground) 6%, transparent);
+  border: 1px solid var(--border);
+}
+.markdown-body pre code {
+  padding: 0;
+  background: transparent;
+  font-size: 0.82em;
+  line-height: 1.6;
+}
+.markdown-body blockquote {
+  margin: 0.75em 0;
+  padding-left: 0.9em;
+  border-left: 3px solid var(--border);
+  color: var(--muted-foreground);
+}
+.markdown-body table {
+  width: 100%;
+  margin: 0.75em 0;
+  border-collapse: collapse;
+  font-size: 0.85em;
+}
+.markdown-body th,
+.markdown-body td {
+  padding: 0.4em 0.7em;
+  border: 1px solid var(--border);
+  text-align: left;
+}
+.markdown-body a {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    /* iOS 上避免橡皮筋滚动露出白底 */
+    background-color: var(--background);
+  }
+
+  body {
+    margin: 0;
+    min-height: 100svh;
+    color: var(--foreground);
+    font-family:
+      -apple-system, BlinkMacSystemFont, "SF Pro SC", "SF Pro Text", system-ui,
+      "PingFang SC", "Microsoft YaHei", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+
+    /* 有层次的背景：四团柔光 + 底色。fixed 让滚动时背景不动，更像原生 App */
+    background-color: var(--background);
+    background-image:
+      radial-gradient(58rem 44rem at 6% -8%, oklch(0.66 0.21 278 / 0.55), transparent 62%),
+      radial-gradient(50rem 38rem at 98% 0%, oklch(0.7 0.17 202 / 0.5), transparent 62%),
+      radial-gradient(48rem 40rem at 58% 106%, oklch(0.68 0.19 335 / 0.45), transparent 64%),
+      radial-gradient(40rem 34rem at 82% 52%, oklch(0.74 0.15 168 / 0.3), transparent 66%);
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+  }
+
+  .dark body {
+    background-image:
+      radial-gradient(58rem 44rem at 6% -8%, oklch(0.52 0.23 278 / 0.6), transparent 62%),
+      radial-gradient(50rem 38rem at 98% 0%, oklch(0.48 0.18 202 / 0.5), transparent 62%),
+      radial-gradient(48rem 40rem at 58% 106%, oklch(0.48 0.2 335 / 0.45), transparent 64%),
+      radial-gradient(40rem 34rem at 82% 52%, oklch(0.5 0.16 168 / 0.3), transparent 66%);
+  }
+
+  /* 移动端：backdrop-filter 层层叠加很吃 GPU，降低模糊半径保帧率 */
+  @media (max-width: 768px) {
+    .glass,
+    .glass-strong {
+      backdrop-filter: blur(16px) saturate(170%);
+      -webkit-backdrop-filter: blur(16px) saturate(170%);
+    }
+  }
+
+  /* 尊重"减少动态效果"系统设置 */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  /* 滚动条 */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: color-mix(in oklch, var(--muted-foreground) 35%, transparent);
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in oklch, var(--muted-foreground) 55%, transparent);
+    background-clip: content-box;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+}

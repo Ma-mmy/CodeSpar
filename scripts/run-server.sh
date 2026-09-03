@@ -42,11 +42,13 @@ command -v java >/dev/null || { echo "✗ 未找到 java，请安装 JDK 21+" >&
 CODESPAR_PORT="${CODESPAR_PORT:-8099}"
 CODESPAR_BIND="${CODESPAR_BIND:-127.0.0.1}"
 CODESPAR_DB_PATH="${CODESPAR_DB_PATH:-/var/lib/codespar/codespar.db}"
+CODESPAR_NOTES_DIR="${CODESPAR_NOTES_DIR:-$(dirname "$CODESPAR_DB_PATH")/notes}"
 CODESPAR_MASTER_KEY_FILE="${CODESPAR_MASTER_KEY_FILE:-$(dirname "$CODESPAR_DB_PATH")/master.key}"
 CODESPAR_ACCESS_HASH_FILE="${CODESPAR_ACCESS_HASH_FILE:-$(dirname "$CODESPAR_DB_PATH")/access.hash}"
 CODESPAR_JAVA_OPTS="${CODESPAR_JAVA_OPTS:-}"
 
 mkdir -p "$(dirname "$CODESPAR_DB_PATH")"
+mkdir -p "$CODESPAR_NOTES_DIR"
 mkdir -p "$(dirname "$CODESPAR_MASTER_KEY_FILE")"
 mkdir -p "$(dirname "$CODESPAR_ACCESS_HASH_FILE")"
 
@@ -54,6 +56,7 @@ echo "==> CodeSpar"
 echo "    jar:        $CODESPAR_JAR"
 echo "    bind:       $CODESPAR_BIND:$CODESPAR_PORT"
 echo "    db:         $CODESPAR_DB_PATH"
+echo "    notes:      $CODESPAR_NOTES_DIR"
 echo "    master-key: ${CODESPAR_MASTER_KEY:+(环境变量 CODESPAR_MASTER_KEY)}${CODESPAR_MASTER_KEY:-$CODESPAR_MASTER_KEY_FILE}"
 echo "    access-hash:${CODESPAR_ACCESS_HASH_FILE}"
 echo "    health:     http://${CODESPAR_BIND}:$CODESPAR_PORT/api/health"
@@ -64,5 +67,6 @@ exec java $CODESPAR_JAVA_OPTS -jar "$CODESPAR_JAR" \
   --server.address="$CODESPAR_BIND" \
   --server.port="$CODESPAR_PORT" \
   --spring.datasource.url="jdbc:sqlite:${CODESPAR_DB_PATH}?journal_mode=WAL&busy_timeout=30000&foreign_keys=on" \
+  --codespar.notes.dir="$CODESPAR_NOTES_DIR" \
   --codespar.crypto.master-key-file="$CODESPAR_MASTER_KEY_FILE" \
   --codespar.access.hash-file="$CODESPAR_ACCESS_HASH_FILE"

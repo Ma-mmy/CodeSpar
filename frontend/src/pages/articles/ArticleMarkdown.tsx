@@ -9,9 +9,11 @@ type HeadingTag = 'h1' | 'h2' | 'h3'
 export function ArticleMarkdown({
   children,
   idPrefix = '',
+  articleId,
 }: {
   children: string
   idPrefix?: string
+  articleId?: number
 }) {
   const headings = useMemo(() => extractHeadings(children, idPrefix), [children, idPrefix])
   const cursor = useRef(0)
@@ -31,8 +33,8 @@ export function ArticleMarkdown({
           </Tag>
         )
       }
-    return { h1: wrap('h1'), h2: wrap('h2'), h3: wrap('h3'), img: ArticleImage }
-  }, [headings])
+    return { h1: wrap('h1'), h2: wrap('h2'), h3: wrap('h3'), img: (props: ComponentPropsWithoutRef<'img'> & ExtraProps) => <ArticleImage {...props} articleId={articleId} /> }
+  }, [headings, articleId])
 
   return (
     <div className="markdown-body min-w-0 max-w-full">
@@ -44,7 +46,7 @@ export function ArticleMarkdown({
 }
 
 /** http(s)/data/blob 才交给浏览器加载；相对路径（如镜像知识库的 access/*.png）没有随 .md 入库。 */
-function isLoadableSrc(src: string | Blob | undefined): src is string {
+function isLoadableSrc(src: string | Blob | undefined): boolean {
   return typeof src === 'string' && /^(https?:|data:|blob:)/i.test(src)
 }
 
@@ -52,10 +54,14 @@ function ArticleImage({
   node: _node,
   src,
   alt,
+  articleId,
   ...props
-}: ComponentPropsWithoutRef<'img'> & ExtraProps) {
-  if (isLoadableSrc(src)) {
+}: ComponentPropsWithoutRef<'img'> & ExtraProps & { articleId?: number }) {
+  if (typeof src === 'string' && isLoadableSrc(src)) {
     return <img src={src} alt={alt ?? ''} {...props} />
+  }
+  if (articleId != null && typeof src === 'string' && src.trim()) {
+    return <img src={`/api/articles/${articleId}/assets?path=${encodeURIComponent(src)}`} alt={alt ?? ''} {...props} />
   }
   const label = alt?.trim() || '图片未随文章导入'
   return (

@@ -25,6 +25,8 @@ fi
 # SQLite 数据库文件 —— 应用启动时自动创建，无需手动建库
 # 并行 worktree 必须换 CODESPAR_DB_PATH，禁止多进程写默认库
 DB_PATH="${CODESPAR_DB_PATH:-$HOME/.codespar/codespar.db}"
+# 文章与图片资料根；未设置时后端会使用数据库同目录下的 notes/
+NOTES_DIR="${CODESPAR_NOTES_DIR:-$(dirname "$DB_PATH")/notes}"
 
 info()  { printf '\033[0;36m==>\033[0m %s\n' "$*"; }
 ok()    { printf '\033[0;32m✓\033[0m %s\n' "$*"; }

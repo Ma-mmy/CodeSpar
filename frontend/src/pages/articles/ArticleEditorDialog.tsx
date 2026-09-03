@@ -45,6 +45,7 @@ export function ArticleEditorDialog({
   categories,
   onSubmit,
   submitting,
+  articleId,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -61,6 +62,7 @@ export function ArticleEditorDialog({
   categories: CategoryItem[]
   onSubmit: () => void
   submitting: boolean
+  articleId?: number
 }) {
   const [view, setView] = useState<EditorView>('split')
   const canSubmit = !!title.trim() && !!body.trim() && !submitting
@@ -165,7 +167,7 @@ export function ArticleEditorDialog({
           {view !== 'source' && (
             <div className="article-reader min-h-0 overflow-y-auto rounded-xl border border-border bg-black/[0.02] p-4 dark:bg-white/[0.03]">
               {body.trim() ? (
-                <ArticleMarkdown>{body}</ArticleMarkdown>
+                <ArticleMarkdown articleId={articleId}>{body}</ArticleMarkdown>
               ) : (
                 <p className="text-sm text-muted-foreground">预览将显示在这里</p>
               )}

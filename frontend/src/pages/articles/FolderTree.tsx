@@ -195,6 +195,7 @@ function ArticleRow({
       onClick={onSelect}
       className={cn(
         'flex w-full items-center gap-2 rounded-lg px-1.5 py-1.5 text-left text-sm transition',
+        article.missing && 'opacity-50',
         selected
           ? 'bg-primary/10 font-medium text-foreground'
           : 'text-muted-foreground hover:bg-black/5 hover:text-foreground dark:hover:bg-white/5',

@@ -18,6 +18,8 @@ export interface ArticleListItem {
   category?: string
   categoryLabel?: string
   summaryStatus: SummaryStatus
+  sourcePath?: string
+  missing?: boolean
   updatedAt?: string
   createdAt?: string
 }
@@ -39,6 +41,8 @@ export interface ArticleDetail {
   category?: string
   categoryLabel?: string
   bodyMd: string
+  sourcePath?: string
+  missing?: boolean
   summaryMd?: string
   summaryJson?: unknown
   summaryStatus: SummaryStatus
@@ -79,8 +83,14 @@ export interface UpdateSummaryBody {
   summaryJson?: ArticleSummaryStructured | null
 }
 
+export interface SyncResult { added: number; updated: number; missing: number; skipped: number }
+export interface ArticleMeta { notesDir: string }
+
 export const articlesApi = {
   tree: () => api.get<FolderView>('/articles/tree'),
+  sync: () => api.post<SyncResult>('/articles/sync', {}),
+  meta: () => api.get<ArticleMeta>('/articles/meta'),
+  assetUrl: (id: number, path: string) => `/api/articles/${id}/assets?path=${encodeURIComponent(path)}`,
   get: (id: number) => api.get<ArticleDetail>(`/articles/${id}`),
   create: (body: UpsertArticleBody) => api.post<ArticleDetail>('/articles', body),
   update: (id: number, body: UpsertArticleBody) => api.put<ArticleDetail>(`/articles/${id}`, body),

@@ -62,8 +62,8 @@ spring:
 
   servlet:
     multipart:
-      max-file-size: 256KB
-      max-request-size: 512KB
+      max-file-size: 1MB
+      max-request-size: 2MB
 
   web:
     resources:
@@ -79,6 +79,9 @@ mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml
 
 codespar:
+  notes:
+    # 未显式配置时，由 NotesPath 取 SQLite 文件父目录下的 notes/。
+    dir: ${CODESPAR_NOTES_DIR:}
   http:
     connect-timeout-sec: 15
     read-timeout-sec: 180       # LLM 出题一批可能跑一两分钟

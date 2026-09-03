@@ -23,6 +23,8 @@ public class ArticleFolder {
 
     private Integer sortOrder;
 
+    private String sourcePath;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 

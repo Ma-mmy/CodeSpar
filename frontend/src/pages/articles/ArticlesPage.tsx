@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import {
@@ -10,6 +10,7 @@ import {
   Pencil,
   Trash2,
   Upload,
+  RefreshCw,
 } from 'lucide-react'
 import {
   Alert,
@@ -59,11 +60,13 @@ export function ArticlesPage() {
   const toast = useToast()
   const qc = useQueryClient()
   const fileRef = useRef<HTMLInputElement>(null)
+  const autoSyncStarted = useRef(false)
   const [searchParams, setSearchParams] = useSearchParams()
 
   const selectedId = parseId(searchParams.get('id'))
 
   const treeQ = useQuery({ queryKey: ['articles', 'tree'], queryFn: articlesApi.tree })
+  const metaQ = useQuery({ queryKey: ['articles', 'meta'], queryFn: articlesApi.meta })
   const { data: categories } = useQuery({ queryKey: ['categories'], queryFn: categoriesApi.list })
 
   const [tab, setTab] = useState<Tab>('body')
@@ -222,6 +225,22 @@ export function ArticlesPage() {
     onError: (e) => toast('上传失败', { variant: 'danger', description: (e as Error).message }),
   })
 
+  const sync = useMutation({
+    mutationFn: articlesApi.sync,
+    onSuccess: (r) => {
+      invalidateTree()
+      toast('目录已同步', { variant: 'success', description: `新增 ${r.added}，更新 ${r.updated}，缺失 ${r.missing}，跳过 ${r.skipped}` })
+    },
+    onError: (e) => toast('同步失败', { variant: 'danger', description: (e as Error).message }),
+  })
+  const runSync = sync.mutate
+
+  useEffect(() => {
+    if (autoSyncStarted.current) return
+    autoSyncStarted.current = true
+    runSync()
+  }, [runSync])
+
   const folderOptions = useMemo(() => flattenFolders(treeQ.data), [treeQ.data])
   const article = detailQ.data
   const headings = useMemo(() => {
@@ -299,6 +318,11 @@ export function ArticlesPage() {
           onClick={() => fileRef.current?.click()}
         >
           {upload.isPending ? <Loader2 className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />}
+        </Button>
+      </Tooltip>
+      <Tooltip content="同步目录">
+        <Button type="button" size="sm" variant="ghost" aria-label="同步目录" disabled={sync.isPending} onClick={() => runSync()}>
+          <RefreshCw className={`size-3.5 ${sync.isPending ? 'animate-spin' : ''}`} />
         </Button>
       </Tooltip>
       <input
@@ -408,7 +432,7 @@ export function ArticlesPage() {
             <EmptyState
               icon={BookOpen}
               title="选择或创建一篇文章"
-              description="左侧目录树选择文章；可拖拽文章/文件夹到目标目录。"
+              description={treeQ.data && treeQ.data.children.length === 0 && treeQ.data.articles.length === 0 && metaQ.data ? `把资料拷到 ${metaQ.data.notesDir} 后点同步目录。` : '左侧目录树选择文章；可拖拽文章/文件夹到目标目录。'}
             />
           ) : detailQ.isLoading ? (
             <div className="space-y-3">
@@ -435,7 +459,7 @@ export function ArticlesPage() {
               </Tabs>
               <div className="mt-4 min-w-0 flex-1">
                 {tab === 'body' ? (
-                  <ArticleMarkdown>{article.bodyMd}</ArticleMarkdown>
+                  article.missing ? <Alert variant="danger">磁盘上的 Markdown 文件已缺失，请恢复文件后同步目录。</Alert> : <ArticleMarkdown articleId={article.id}>{article.bodyMd}</ArticleMarkdown>
                 ) : (
                   <SummaryPanel
                     article={article}
@@ -484,6 +508,7 @@ export function ArticlesPage() {
         folderOptions={folderOptions}
         categories={categories ?? []}
         submitting={editorMode === 'create' ? createArticle.isPending : saveArticle.isPending}
+        articleId={editorMode === 'edit' ? article?.id : undefined}
         onSubmit={() => {
           if (editorMode === 'create') createArticle.mutate()
           else saveArticle.mutate()

@@ -10,7 +10,7 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 /**
- * 文章（Markdown 原文 + 考点摘要）。
+ * 文章索引与派生摘要。Markdown 原文以 sourcePath 对应的磁盘文件为准。
  * <p>summaryStatus: NONE / RUNNING / READY / FAILED / STALE
  */
 @Data
@@ -32,6 +32,8 @@ public class Article {
 
     /** 正文 SHA-256，用于判断摘要是否过期 */
     private String bodyHash;
+
+    private String sourcePath;
 
     private String summaryMd;
 

@@ -10,6 +10,7 @@ import com.codespar.model.dto.ArticleDTO.RefineRequest;
 import com.codespar.model.dto.ArticleDTO.RenameFolderRequest;
 import com.codespar.model.dto.ArticleDTO.UpdateSummaryRequest;
 import com.codespar.model.dto.ArticleDTO.UpsertArticleRequest;
+import com.codespar.model.dto.ArticleDTO.SyncResult;
 import com.codespar.model.dto.ExamDTO.ExamListItem;
 import com.codespar.service.ArticleService;
 import jakarta.validation.Valid;
@@ -40,6 +41,17 @@ public class ArticleController {
     @GetMapping("/tree")
     public FolderView tree() {
         return service.tree();
+    }
+
+    @PostMapping("/sync")
+    public SyncResult sync() { return service.sync(); }
+
+    @GetMapping("/meta")
+    public com.codespar.model.dto.ArticleDTO.ArticleMeta meta() { return service.meta(); }
+
+    @GetMapping("/{id}/assets")
+    public ResponseEntity<byte[]> asset(@PathVariable Long id, @RequestParam("path") String path) {
+        return service.asset(id, path);
     }
 
     @PostMapping("/folders")

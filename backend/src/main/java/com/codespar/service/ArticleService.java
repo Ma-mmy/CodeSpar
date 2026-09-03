@@ -7,6 +7,7 @@ import com.codespar.ai.PromptBuilder;
 import com.codespar.mapper.ArticleFolderMapper;
 import com.codespar.mapper.ArticleMapper;
 import com.codespar.mapper.ExamMapper;
+import com.codespar.model.dto.ArticleDTO;
 import com.codespar.model.dto.ArticleDTO.ArticleDetail;
 import com.codespar.model.dto.ArticleDTO.ArticleListItem;
 import com.codespar.model.dto.ArticleDTO.CreateFolderRequest;
@@ -30,11 +31,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -51,7 +55,8 @@ import java.util.concurrent.ExecutorService;
 @RequiredArgsConstructor
 public class ArticleService {
 
-    public static final int MAX_BODY_BYTES = 200 * 1024;
+    public static final int MAX_BODY_BYTES = 1024 * 1024;
+    public static final int MAX_REFINE_BYTES = 200 * 1024;
     private static final int MAX_FOLDER_DEPTH = 5;
 
     private final ArticleFolderMapper folderMapper;
@@ -65,6 +70,7 @@ public class ArticleService {
     private final LenientJsonParser jsonParser;
     private final ExecutorService generationExecutor;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+    private final NotesPath notesPath;
 
     /* ========================================================== 树 */
 
@@ -118,6 +124,7 @@ public class ArticleService {
     @Transactional
     public FolderView createFolder(CreateFolderRequest req) {
         String name = req.getName().trim();
+        validateFileName(name);
         if (req.getParentId() != null) {
             getFolderRequired(req.getParentId());
             if (depthOf(req.getParentId()) + 1 > MAX_FOLDER_DEPTH) {
@@ -128,6 +135,8 @@ public class ArticleService {
         f.setParentId(req.getParentId());
         f.setName(name);
         f.setSortOrder(0);
+        f.setSourcePath(folderSourcePath(req.getParentId(), name));
+        notesPath.createDirectory(f.getSourcePath());
         folderMapper.insert(f);
         return toFolderView(f);
     }
@@ -135,7 +144,15 @@ public class ArticleService {
     @Transactional
     public FolderView renameFolder(Long id, RenameFolderRequest req) {
         ArticleFolder f = getFolderRequired(id);
+        validateFileName(req.getName().trim());
+        String oldPath = f.getSourcePath();
         f.setName(req.getName().trim());
+        if (oldPath != null) {
+            String next = folderSourcePath(f.getParentId(), f.getName());
+            notesPath.move(oldPath, next);
+            f.setSourcePath(next);
+            replaceSourcePrefix(oldPath, next, id);
+        }
         folderMapper.updateById(f);
         return toFolderView(f);
     }
@@ -156,9 +173,16 @@ public class ArticleService {
                 throw new BizException("移动后超过最大嵌套深度 " + MAX_FOLDER_DEPTH);
             }
         }
+        String oldPath = f.getSourcePath();
         f.setParentId(newParent);
         if (req.getSortOrder() != null) {
             f.setSortOrder(req.getSortOrder());
+        }
+        if (oldPath != null) {
+            String next = folderSourcePath(newParent, f.getName());
+            notesPath.move(oldPath, next);
+            f.setSourcePath(next);
+            replaceSourcePrefix(oldPath, next, id);
         }
         folderMapper.updateById(f);
         return toFolderView(f);
@@ -166,7 +190,7 @@ public class ArticleService {
 
     @Transactional
     public void deleteFolder(Long id) {
-        getFolderRequired(id);
+        ArticleFolder folder = getFolderRequired(id);
         Long childFolders = folderMapper.selectCount(Wrappers.<ArticleFolder>lambdaQuery()
                 .eq(ArticleFolder::getParentId, id));
         Long childArticles = articleMapper.selectCount(Wrappers.<Article>lambdaQuery()
@@ -175,6 +199,9 @@ public class ArticleService {
             throw new BizException("文件夹非空，请先移走或删除其中的文章与子文件夹");
         }
         folderMapper.deleteById(id);
+        if (folder.getSourcePath() != null) {
+            notesPath.delete(folder.getSourcePath());
+        }
     }
 
     /* ========================================================== 文章 CRUD */
@@ -198,6 +225,10 @@ public class ArticleService {
         a.setBodyHash(sha256(req.getBodyMd()));
         a.setSummaryStatus("NONE");
         articleMapper.insert(a);
+        String source = articleSourcePath(a, req.getTitle());
+        notesPath.write(source, req.getBodyMd());
+        a.setSourcePath(source);
+        articleMapper.updateById(a);
         return toDetail(a);
     }
 
@@ -213,6 +244,9 @@ public class ArticleService {
         a.setFolderId(req.getFolderId());
         a.setTitle(req.getTitle().trim());
         a.setCategory(normalizeCategory(req.getCategory()));
+        String source = a.getSourcePath() == null ? articleSourcePath(a, req.getTitle()) : a.getSourcePath();
+        notesPath.write(source, req.getBodyMd());
+        a.setSourcePath(source);
         a.setBodyMd(req.getBodyMd());
         a.setBodyHash(newHash);
         if (bodyChanged && ("READY".equals(a.getSummaryStatus()) || "STALE".equals(a.getSummaryStatus()))) {
@@ -231,6 +265,12 @@ public class ArticleService {
         if (req.getFolderId() != null) {
             getFolderRequired(req.getFolderId());
         }
+        if (a.getSourcePath() != null) {
+            String filename = Path.of(a.getSourcePath()).getFileName().toString();
+            String next = folderSourcePath(req.getFolderId(), "") + filename;
+            notesPath.move(a.getSourcePath(), next);
+            a.setSourcePath(next);
+        }
         a.setFolderId(req.getFolderId());
         articleMapper.updateById(a);
         return toDetail(a);
@@ -246,7 +286,7 @@ public class ArticleService {
             throw new BizException("仅支持上传 .md 文件");
         }
         if (file.getSize() > MAX_BODY_BYTES) {
-            throw new BizException("单篇正文不超过 200KB，请拆分后再上传");
+            throw new BizException("单篇正文不超过 1MB，请拆分后再上传");
         }
         String body;
         try {
@@ -275,7 +315,7 @@ public class ArticleService {
      */
     @Transactional
     public void delete(Long id) {
-        getRequired(id);
+        Article article = getRequired(id);
         List<Exam> exams = examMapper.selectList(Wrappers.<Exam>lambdaQuery()
                 .eq(Exam::getArticleId, id));
         for (Exam e : exams) {
@@ -289,6 +329,9 @@ public class ArticleService {
             }
         }
         articleMapper.deleteById(id);
+        if (article.getSourcePath() != null) {
+            notesPath.delete(article.getSourcePath());
+        }
     }
 
     /* ========================================================== 摘要 / 开卷 */
@@ -324,6 +367,9 @@ public class ArticleService {
 
     public ArticleDetail refine(Long id, RefineRequest req) {
         Article a = getRequired(id);
+        if (a.getSourcePath() != null && !notesPath.exists(a.getSourcePath())) throw new BizException("磁盘上的 Markdown 文件已缺失，无法提炼");
+        String body = readBody(a);
+        if (body.getBytes(StandardCharsets.UTF_8).length > MAX_REFINE_BYTES) throw new BizException("单篇正文超过 200KB，请拆分后再提炼");
         boolean force = req != null && req.isForce();
         if ("RUNNING".equals(a.getSummaryStatus())) {
             return toDetail(a);
@@ -348,6 +394,7 @@ public class ArticleService {
 
     public OpenContext openContext(Long id) {
         Article a = getRequired(id);
+        if (a.getSourcePath() != null && !notesPath.exists(a.getSourcePath())) throw new BizException("磁盘上的 Markdown 文件已缺失，无法开卷");
         if (!"READY".equals(a.getSummaryStatus()) && !"STALE".equals(a.getSummaryStatus())) {
             throw new BizException("请先完成考点摘要提炼后再开卷");
         }
@@ -372,9 +419,120 @@ public class ArticleService {
         return examService.listByArticle(articleId);
     }
 
+    public ResponseEntity<byte[]> asset(Long id, String relativePath) {
+        Article a = getRequired(id);
+        if (a.getSourcePath() == null) throw new BizException("文章没有磁盘来源");
+        Path file = notesPath.resolve(Path.of(a.getSourcePath()).getParent() == null ? "" : Path.of(a.getSourcePath()).getParent().toString().replace('\\','/'), relativePath);
+        if (!notesPath.isAsset(file.getFileName().toString())) throw new BizException("不支持的图片格式");
+        byte[] bytes = notesPath.readBytes(file);
+        MediaType type = MediaType.APPLICATION_OCTET_STREAM;
+        try { String detected = notesPath.mediaType(file); if (detected != null) type = MediaType.parseMediaType(detected); } catch (Exception ignored) { }
+        return ResponseEntity.ok().contentType(type).header("Cache-Control", "no-cache").body(bytes);
+    }
+
     public Article getEntityRequired(Long id) {
         return getRequired(id);
     }
+
+    @Transactional
+    public ArticleDTO.SyncResult sync() {
+        ArticleDTO.SyncResult result = new ArticleDTO.SyncResult();
+        List<ArticleFolder> legacyFolders = folderMapper.selectList(Wrappers.<ArticleFolder>lambdaQuery().isNull(ArticleFolder::getSourcePath));
+        legacyFolders.sort((left, right) -> Integer.compare(depthOf(left.getId()), depthOf(right.getId())));
+        for (ArticleFolder folder : legacyFolders) {
+            String source = folderSourcePath(folder.getParentId(), folder.getName());
+            if (folderMapper.selectCount(Wrappers.<ArticleFolder>lambdaQuery().eq(ArticleFolder::getSourcePath, source)) > 0) source += "-" + folder.getId();
+            notesPath.createDirectory(source);
+            folder.setSourcePath(source);
+            folderMapper.updateById(folder);
+        }
+        Map<String, ArticleFolder> folders = new HashMap<>();
+        for (ArticleFolder f : folderMapper.selectList(null)) if (f.getSourcePath() != null) folders.put(f.getSourcePath(), f);
+        List<Path> diskDirectories = collectDirs();
+        Set<String> seenDirectories = new HashSet<>();
+        for (Path dir : diskDirectories) {
+            String rel = notesPath.relative(dir);
+            if (rel.isEmpty()) continue;
+            seenDirectories.add(rel);
+            ArticleFolder f = folders.get(rel);
+            if (f == null) { f = new ArticleFolder(); f.setName(dir.getFileName().toString()); f.setParentId(parentFolderId(rel, folders)); f.setSortOrder(0); f.setSourcePath(rel); folderMapper.insert(f); folders.put(rel, f); }
+        }
+        // One-time migration for rows created before source_path existed.
+        for (Article legacy : articleMapper.selectList(Wrappers.<Article>lambdaQuery().isNull(Article::getSourcePath))) {
+            String source = articleSourcePath(legacy, legacy.getTitle());
+            notesPath.write(source, legacy.getBodyMd() == null ? "" : legacy.getBodyMd());
+            legacy.setSourcePath(source);
+            legacy.setBodyHash(sha256(legacy.getBodyMd() == null ? "" : legacy.getBodyMd()));
+            articleMapper.updateById(legacy);
+            result.setUpdated(result.getUpdated() + 1);
+        }
+        Set<String> seen = new HashSet<>();
+        for (Path file : notesPath.markdownFiles()) {
+            String source = notesPath.relative(file); seen.add(source);
+            String body;
+            try { body = notesPath.read(file, NotesPath.MAX_ARTICLE_BYTES); } catch (Exception e) { result.setSkipped(result.getSkipped()+1); continue; }
+            Article a = articleMapper.selectOne(Wrappers.<Article>lambdaQuery().eq(Article::getSourcePath, source));
+            String hash = sha256(body);
+            if (a == null) { a = new Article(); a.setSourcePath(source); a.setFolderId(folderIdFor(Path.of(source).getParent(), folders)); a.setTitle(deriveTitle(file.getFileName().toString(), body)); a.setBodyMd(body); a.setBodyHash(hash); a.setSummaryStatus("NONE"); articleMapper.insert(a); result.setAdded(result.getAdded()+1); }
+            else if (!Objects.equals(hash, a.getBodyHash())) { a.setTitle(deriveTitle(file.getFileName().toString(), body)); a.setBodyMd(body); a.setBodyHash(hash); if ("READY".equals(a.getSummaryStatus()) || "STALE".equals(a.getSummaryStatus())) a.setSummaryStatus("STALE"); articleMapper.updateById(a); result.setUpdated(result.getUpdated()+1); }
+        }
+        for (Article a : articleMapper.selectList(Wrappers.<Article>lambdaQuery().isNotNull(Article::getSourcePath))) {
+            if (!seen.contains(a.getSourcePath())) {
+                List<Exam> linked = examMapper.selectList(Wrappers.<Exam>lambdaQuery().eq(Exam::getArticleId, a.getId()));
+                boolean hasSubmitted = linked.stream().anyMatch(e -> !"NOT_STARTED".equals(e.getStatus()) && !"IN_PROGRESS".equals(e.getStatus()));
+                if (!hasSubmitted) delete(a.getId());
+                result.setMissing(result.getMissing()+1);
+            }
+        }
+        List<ArticleFolder> indexedFolders = folderMapper.selectList(null);
+        indexedFolders.sort((left, right) -> Integer.compare(depthOf(right.getId()), depthOf(left.getId())));
+        for (ArticleFolder folder : indexedFolders) {
+            if (folder.getSourcePath() == null || seenDirectories.contains(folder.getSourcePath())) continue;
+            Long childFolders = folderMapper.selectCount(Wrappers.<ArticleFolder>lambdaQuery().eq(ArticleFolder::getParentId, folder.getId()));
+            Long childArticles = articleMapper.selectCount(Wrappers.<Article>lambdaQuery().eq(Article::getFolderId, folder.getId()));
+            if ((childFolders == null || childFolders == 0) && (childArticles == null || childArticles == 0)) folderMapper.deleteById(folder.getId());
+        }
+        return result;
+    }
+
+    public ArticleDTO.ArticleMeta meta() {
+        ArticleDTO.ArticleMeta meta = new ArticleDTO.ArticleMeta();
+        meta.setNotesDir(notesPath.getRoot().toString());
+        return meta;
+    }
+
+    private List<Path> collectDirs() { return notesPath.directories(); }
+
+    private Long parentFolderId(String rel, Map<String, ArticleFolder> folders) { Path p = Path.of(rel).getParent(); ArticleFolder f = p == null ? null : folders.get(p.toString().replace('\\','/')); return f == null ? null : f.getId(); }
+    private Long folderIdFor(Path p, Map<String, ArticleFolder> folders) { ArticleFolder f = p == null ? null : folders.get(p.toString().replace('\\','/')); return f == null ? null : f.getId(); }
+    private String folderSourcePath(Long parentId, String name) {
+        String base = "";
+        if (parentId != null) { ArticleFolder p = getFolderRequired(parentId); base = p.getSourcePath() == null ? p.getName() : p.getSourcePath(); }
+        return base.isEmpty() ? name : base + "/" + name;
+    }
+    private String articleSourcePath(Article a, String title) {
+        String dir = "";
+        if (a.getFolderId() != null) { ArticleFolder f = getFolderRequired(a.getFolderId()); dir = f.getSourcePath() == null ? f.getName() : f.getSourcePath(); }
+        String slug = title.trim().replaceAll("[^\\p{L}\\p{N}._-]+", "-");
+        if (slug.isBlank()) slug = "article";
+        String candidate = (dir.isBlank() ? "" : dir + "/") + slug + "-" + (a.getId() == null ? System.currentTimeMillis() : a.getId()) + ".md";
+        return candidate;
+    }
+    private void replaceSourcePrefix(String oldPrefix, String newPrefix, Long rootFolderId) {
+        for (ArticleFolder child : folderMapper.selectList(null)) {
+            if (!Objects.equals(child.getId(), rootFolderId) && child.getSourcePath() != null && child.getSourcePath().startsWith(oldPrefix + "/")) {
+                child.setSourcePath(newPrefix + child.getSourcePath().substring(oldPrefix.length()));
+                folderMapper.updateById(child);
+            }
+        }
+        for (Article article : articleMapper.selectList(null)) {
+            if (article.getSourcePath() != null && article.getSourcePath().startsWith(oldPrefix + "/")) {
+                article.setSourcePath(newPrefix + article.getSourcePath().substring(oldPrefix.length()));
+                articleMapper.updateById(article);
+            }
+        }
+    }
+    private String readBody(Article a) { return a.getSourcePath() == null ? a.getBodyMd() : notesPath.read(notesPath.article(a.getSourcePath()), NotesPath.MAX_ARTICLE_BYTES); }
 
     /* ========================================================== 摘要执行 */
 
@@ -389,7 +547,7 @@ public class ArticleService {
             String prompt = promptBuilder.buildArticleRefine(
                     a.getTitle(),
                     a.getCategory(),
-                    a.getBodyMd());
+                    readBody(a));
             ChatResponse resp = chatModel.call(new Prompt(prompt));
             String raw = extractText(resp);
             if (raw == null || raw.isBlank()) {
@@ -446,13 +604,14 @@ public class ArticleService {
         }
         int bytes = body.getBytes(StandardCharsets.UTF_8).length;
         if (bytes > MAX_BODY_BYTES) {
-            throw new BizException("单篇正文不超过 200KB，当前约 " + (bytes / 1024) + "KB，请拆分后再保存");
+            throw new BizException("单篇正文不超过 1MB，当前约 " + (bytes / 1024) + "KB，请拆分后再保存");
         }
     }
 
     private String normalizeCategory(String code) {
         return categoryService.requireExistingOrNull(code);
     }
+    private void validateFileName(String name) { if (name.equals(".") || name.equals("..") || name.contains("/") || name.contains("\\") || name.indexOf('\0') >= 0) throw new BizException("文件夹名称无效"); }
 
     private ModelProfile resolveGenerateModel(Long modelId) {
         if (modelId != null) {
@@ -615,6 +774,8 @@ public class ArticleService {
         v.setSummaryStatus(a.getSummaryStatus());
         v.setCreatedAt(a.getCreatedAt());
         v.setUpdatedAt(a.getUpdatedAt());
+        v.setSourcePath(a.getSourcePath());
+        v.setMissing(a.getSourcePath() != null && !notesPath.exists(a.getSourcePath()));
         return v;
     }
 
@@ -627,7 +788,9 @@ public class ArticleService {
         if (a.getCategory() != null && !a.getCategory().isBlank()) {
             v.setCategoryLabel(categoryService.labelOf(a.getCategory()));
         }
-        v.setBodyMd(a.getBodyMd());
+        try { v.setBodyMd(readBody(a)); } catch (BizException e) { v.setBodyMd(""); }
+        v.setSourcePath(a.getSourcePath());
+        v.setMissing(a.getSourcePath() != null && !notesPath.exists(a.getSourcePath()));
         v.setSummaryMd(a.getSummaryMd());
         v.setSummaryStatus(a.getSummaryStatus());
         v.setSummaryError(a.getSummaryError());

@@ -36,7 +36,7 @@ cp .env.local.example .env.local
 
 首次运行会自动构建前端与后端，耗时稍长。之后启动只需几秒。
 
-数据库文件位于 `~/.codespar/codespar.db`（可用 `CODESPAR_DB_PATH` 改位置），表结构由 Flyway 自动迁移。
+数据库文件位于 `~/.codespar/codespar.db`（可用 `CODESPAR_DB_PATH` 改位置），表结构由 Flyway 自动迁移。文章 Markdown 与相对图片位于同目录下的 `notes/`，可用 `CODESPAR_NOTES_DIR` 指定绝对路径。
 
 服务地址 http://localhost:8099
 
@@ -67,6 +67,7 @@ cp .env.local.example .env.local
 | `CODESPAR_PORT` | `8099` | 应用端口 |
 | `CODESPAR_BIND` | `127.0.0.1` | 监听地址。公网请反代，不要直接绑 `0.0.0.0` |
 | `CODESPAR_DB_PATH` | `~/.codespar/codespar.db` | SQLite 数据库文件路径（首次启动自动创建） |
+| `CODESPAR_NOTES_DIR` | 数据库同目录下的 `notes/` | Markdown 与相对图片的共同资料根 |
 | `CODESPAR_ACCESS_PASSWORD` | （空） | 默认访问口令，至少 8 位。设置页改过之后以本机哈希为准 |
 
 各家模型的 apiKey 不走配置文件，而是在应用内「模型管理」页录入，

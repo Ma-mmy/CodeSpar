@@ -215,7 +215,7 @@ export function SummaryPanel({
             <section id={SUMMARY_TOC.markdown} className="scroll-mt-4 space-y-2">
               <h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">完整 Markdown</h4>
               <GlassCard className="!p-4">
-                <ArticleMarkdown idPrefix={SUMMARY_TOC.mdPrefix}>{article.summaryMd}</ArticleMarkdown>
+                <ArticleMarkdown articleId={article.id} idPrefix={SUMMARY_TOC.mdPrefix}>{article.summaryMd}</ArticleMarkdown>
               </GlassCard>
             </section>
           )}

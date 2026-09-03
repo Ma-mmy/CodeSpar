@@ -28,6 +28,8 @@ public class ArticleDTO {
         private String category;
         private String categoryLabel;
         private String summaryStatus;
+        private String sourcePath;
+        private boolean missing;
         private LocalDateTime updatedAt;
         private LocalDateTime createdAt;
     }
@@ -40,6 +42,8 @@ public class ArticleDTO {
         private String category;
         private String categoryLabel;
         private String bodyMd;
+        private String sourcePath;
+        private boolean missing;
         private String summaryMd;
         private Object summaryJson;
         private String summaryStatus;
@@ -121,5 +125,18 @@ public class ArticleDTO {
         private String summaryStatus;
         private String prompt;
         private String summaryMd;
+    }
+
+    @Data
+    public static class SyncResult {
+        private int added;
+        private int updated;
+        private int missing;
+        private int skipped;
+    }
+
+    @Data
+    public static class ArticleMeta {
+        private String notesDir;
     }
 }

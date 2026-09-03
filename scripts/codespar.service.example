@@ -30,6 +30,7 @@ Environment=CODESPAR_JAR=/opt/codespar/codespar.jar
 Environment=CODESPAR_PORT=8099
 Environment=CODESPAR_BIND=127.0.0.1
 Environment=CODESPAR_DB_PATH=/var/lib/codespar/codespar.db
+Environment=CODESPAR_NOTES_DIR=/var/lib/codespar/notes
 Environment=CODESPAR_MASTER_KEY_FILE=/var/lib/codespar/master.key
 Environment=CODESPAR_ACCESS_HASH_FILE=/var/lib/codespar/access.hash
 # Environment=CODESPAR_ACCESS_PASSWORD=

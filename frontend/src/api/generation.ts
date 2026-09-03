@@ -10,7 +10,6 @@ export type QuestionType =
 
 export type Difficulty = 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' | 'EXPERT'
 export type JobStatus = 'RUNNING' | 'SUCCESS' | 'PARTIAL' | 'FAILED' | 'CANCELLED'
-export type DedupStrength = 'OFF' | 'STANDARD' | 'STRICT'
 
 export const QUESTION_TYPES: Record<QuestionType, string> = {
   SINGLE_CHOICE: '单选',
@@ -37,12 +36,6 @@ export const DIFFICULTIES: Record<Difficulty, string> = {
   EXPERT: '专家',
 }
 
-export const DEDUP_STRENGTHS: Record<DedupStrength, string> = {
-  OFF: '关闭',
-  STANDARD: '标准',
-  STRICT: '严格',
-}
-
 export interface Option {
   key: string
   text: string
@@ -64,7 +57,6 @@ export interface GenerateRequest {
   category?: string
   modelProfileId: number
   language: 'zh' | 'en'
-  dedupStrength: DedupStrength
   /** 出题前是否自动优化提示词；默认 true */
   autoOptimize?: boolean
 }
@@ -111,7 +103,6 @@ export interface GenerateParams {
   category?: string
   modelProfileId?: number
   language?: string
-  dedupStrength?: DedupStrength
   /** null / true = 自动优化；false = 跳过 */
   autoOptimize?: boolean
 }
@@ -173,7 +164,7 @@ export const generationApi = {
   batches: (id: number) => api.get<BatchResultView[]>(`/generations/${id}/batches`),
   cancel: (id: number) => api.post<void>(`/generations/${id}/cancel`),
   confirm: (id: number) => api.post<{ examId: number }>(`/generations/${id}/confirm`),
-  /** 相同参数再来一次（自动带去重） */
+  /** 相同参数再来一次 */
   rerun: (id: number) => api.post<{ id: number }>(`/generations/${id}/rerun`),
   /** 删除出题历史 */
   remove: (id: number) => api.delete<void>(`/generations/${id}`),

@@ -47,25 +47,24 @@ public class PromptBuilder {
     /** 每个题型的专属规则，逐条写清楚最容易出错的字段约束。 */
     private static final Map<QuestionType, String> TYPE_RULES = Map.of(
             QuestionType.SINGLE_CHOICE,
-            "单选题：4 个选项，仅一个正确；correctAnswer 填正确选项的 key；需提供 explanation；fullScore 建议 5 分。",
+            "单选题：4 个选项，仅一个正确；correctAnswer 填正确选项的 key；需提供 explanation；fullScore 建议 5 分。不要输出 referenceAnswer、rubric。",
             QuestionType.MULTI_CHOICE,
-            "多选题：4~6 个选项，2~4 个正确；correctAnswer 填正确选项 keys，逗号分隔（如 \"A,C\"）；需提供 explanation；fullScore 建议 10 分。",
+            "多选题：4~6 个选项，2~4 个正确；correctAnswer 填正确选项 keys，逗号分隔（如 \"A,C\"）；需提供 explanation；fullScore 建议 10 分。不要输出 referenceAnswer、rubric。",
             QuestionType.TRUE_FALSE,
-            "判断题：选项固定为 [{\"key\":\"T\",\"text\":\"正确\"},{\"key\":\"F\",\"text\":\"错误\"}]；correctAnswer 填 T 或 F；需提供 explanation；fullScore 建议 5 分。",
+            "判断题：选项固定为 [{\"key\":\"T\",\"text\":\"正确\"},{\"key\":\"F\",\"text\":\"错误\"}]；correctAnswer 填 T 或 F；需提供 explanation；fullScore 建议 5 分。不要输出 referenceAnswer、rubric。",
             QuestionType.FILL_BLANK,
-            "填空题：题干中用 ____ 表示空；acceptedAnswers 必须包含标准答案与至少 1 个可接受同义表述；需提供 explanation；fullScore 建议 5 分。",
+            "填空题：题干中用 ____ 表示空；acceptedAnswers 必须包含标准答案与至少 1 个可接受同义表述；需提供 explanation；fullScore 建议 5 分。不要输出 referenceAnswer、rubric。",
             QuestionType.SHORT_ANSWER,
-            "概念问答题：需详细作答；referenceAnswer 为详尽的参考答案；rubric 3~5 个得分点，分值之和等于 fullScore（建议 10 分）。",
+            "概念问答题：需详细作答；referenceAnswer 为详尽的参考答案；rubric 3~5 个得分点，分值之和等于 fullScore（建议 10 分）。不要输出 explanation、options、correctAnswer。",
             QuestionType.SYSTEM_DESIGN,
-            "系统设计题：需给出完整架构方案与取舍；referenceAnswer 为详尽的参考答案；rubric 4~6 个得分点（分层方案/延迟与召回的取舍/可观测性/失败降级等），分值之和等于 fullScore（建议 20 分）。");
+            "系统设计题：需给出完整架构方案与取舍；referenceAnswer 为详尽的参考答案；rubric 4~6 个得分点（分层方案/延迟与召回的取舍/可观测性/失败降级等），分值之和等于 fullScore（建议 20 分）。不要输出 explanation、options、correctAnswer。");
 
     private final Map<String, String> templateCache = new ConcurrentHashMap<>();
 
     /* ---------------------------------------------------------- 出题 */
 
-    /** 生成某一题型的 prompt。dedupStems 为空时去重块自动省略。 */
-    public String buildGenerate(GenerateParams params, String instruction, QuestionType type,
-                                int count, List<String> dedupStems) {
+    /** 生成某一题型的 prompt。 */
+    public String buildGenerate(GenerateParams params, String instruction, QuestionType type, int count) {
         Map<String, String> vars = new HashMap<>();
         vars.put("instruction", instruction.trim());
         vars.put("type", type.name());
@@ -76,15 +75,65 @@ public class PromptBuilder {
         vars.put("category_label", categoryLabel(params.getCategory()));
         vars.put("category_whitelist", categoryService.whitelistText());
         vars.put("tags_block", buildTagsBlock(params.getTags(), params.getCategory()));
-        vars.put("dedup_block", buildDedupBlock(dedupStems));
         vars.put("type_rules", TYPE_RULES.get(type));
+        vars.put("output_intro", outputIntro(type));
+        vars.put("output_fields", outputFields(type, vars.get("category_whitelist")));
         return render("generate", vars);
     }
 
-    private static String fieldSpec(QuestionType type) {
-        return "type(\"" + type.name() + "\") / difficulty(只能是 BEGINNER|INTERMEDIATE|ADVANCED|EXPERT，不要用中文)"
-                + " / stem / tags / options / correctAnswer / acceptedAnswers / referenceAnswer"
-                + " / rubric（分值之和等于 fullScore）/ fullScore / explanation";
+    static String outputIntro(QuestionType type) {
+        if (type == QuestionType.SHORT_ANSWER || type == QuestionType.SYSTEM_DESIGN) {
+            return "每道题必须包含详尽参考答案（referenceAnswer）与评分要点（rubric）。不要输出 explanation、options、correctAnswer、acceptedAnswers。";
+        }
+        return "每道题须同步产出答案解析（explanation）。不要输出 referenceAnswer、rubric。";
+    }
+
+    static String outputFields(QuestionType type, String categoryWhitelist) {
+        String whitelist = categoryWhitelist == null || categoryWhitelist.isBlank() ? "（暂无）" : categoryWhitelist;
+        String header = "- \"type\": \"" + type.name() + "\"\n"
+                + "- \"difficulty\": \"BEGINNER\" 或 \"INTERMEDIATE\" 或 \"ADVANCED\" 或 \"EXPERT\"\n"
+                + "- \"stem\": 题干（Markdown，可含代码块）\n"
+                + "- \"tags\": 1~2 个粗粒度分类标签，必须从白名单选取：" + whitelist + "\n";
+        String fullScore = "- \"fullScore\": 本题满分";
+        return header + switch (type) {
+            case SINGLE_CHOICE ->
+                    "- \"options\": [{\"key\":\"A\",\"text\":\"选项文本\"}]，4 个选项\n"
+                            + "- \"correctAnswer\": 正确选项 key\n"
+                            + fullScore + "\n"
+                            + "- \"explanation\": 答案解析，针对易错选项说明错因";
+            case MULTI_CHOICE ->
+                    "- \"options\": [{\"key\":\"A\",\"text\":\"选项文本\"}]，4~6 个选项\n"
+                            + "- \"correctAnswer\": 正确选项 keys，逗号分隔（如 \"A,C\"）\n"
+                            + fullScore + "\n"
+                            + "- \"explanation\": 答案解析，针对易错选项说明错因";
+            case TRUE_FALSE ->
+                    "- \"options\": [{\"key\":\"T\",\"text\":\"正确\"},{\"key\":\"F\",\"text\":\"错误\"}]\n"
+                            + "- \"correctAnswer\": T 或 F\n"
+                            + fullScore + "\n"
+                            + "- \"explanation\": 答案解析，针对易错选项说明错因";
+            case FILL_BLANK ->
+                    "- \"acceptedAnswers\": [\"标准答案\",\"可接受的同义表述\"]\n"
+                            + fullScore + "\n"
+                            + "- \"explanation\": 答案解析";
+            case SHORT_ANSWER, SYSTEM_DESIGN ->
+                    "- \"referenceAnswer\": 参考答案（Markdown，详尽，是复盘学习材料）\n"
+                            + "- \"rubric\": [{\"point\":\"得分点描述\",\"score\":分值}]，分值之和必须等于 fullScore\n"
+                            + fullScore;
+        };
+    }
+
+    static String fieldSpec(QuestionType type) {
+        String common = "type(\"" + type.name() + "\") / difficulty(只能是 BEGINNER|INTERMEDIATE|ADVANCED|EXPERT，不要用中文)"
+                + " / stem / tags";
+        return switch (type) {
+            case SINGLE_CHOICE, MULTI_CHOICE, TRUE_FALSE ->
+                    common + " / options / correctAnswer / fullScore / explanation。不要输出 referenceAnswer、rubric";
+            case FILL_BLANK ->
+                    common + " / acceptedAnswers / fullScore / explanation。不要输出 referenceAnswer、rubric";
+            case SHORT_ANSWER, SYSTEM_DESIGN ->
+                    common + " / referenceAnswer / rubric（分值之和等于 fullScore）/ fullScore。"
+                            + "不要输出 explanation、options、correctAnswer、acceptedAnswers";
+        };
     }
 
     /** 解析失败后的修正 prompt（批量输出）。 */
@@ -95,7 +144,8 @@ public class PromptBuilder {
         vars.put("fix_instructions",
                 "输出结构必须是 {\"questions\":[ 题目对象 ]}。题目对象字段参考："
                         + fieldSpec(type)
-                        + "。共 " + count + " 道，题型为 " + TYPE_LABEL.get(type) + "。");
+                        + "。请只输出还缺的 " + count + " 道" + TYPE_LABEL.get(type)
+                        + "，不要输出已经合格入库的题。");
         return render("fix", vars);
     }
 
@@ -165,6 +215,8 @@ public class PromptBuilder {
         vars.put("original_stem", question.getStem());
         vars.put("feedback", feedback == null || feedback.isBlank() ? "（无，请自由发挥，从新角度命题）" : feedback.trim());
         vars.put("full_score", String.valueOf(question.getFullScore()));
+        vars.put("output_intro", outputIntro(question.getType()));
+        vars.put("output_fields", outputFields(question.getType(), categoryService.whitelistText()));
         return render("regenerate", vars);
     }
 
@@ -225,21 +277,6 @@ public class PromptBuilder {
             return "（未指定，请按题意自选粗分类）";
         }
         return categoryService.labelOf(categoryCode.trim());
-    }
-
-    private static String buildDedupBlock(List<String> dedupStems) {
-        if (dedupStems == null || dedupStems.isEmpty()) {
-            return "";
-        }
-        StringBuilder sb = new StringBuilder("===== 已出过的题（务必避开，从新角度切入）=====\n");
-        for (int i = 0; i < dedupStems.size(); i++) {
-            String stem = dedupStems.get(i);
-            if (stem.length() > 150) {
-                stem = stem.substring(0, 150) + "…";
-            }
-            sb.append(i + 1).append(". ").append(stem.replace('\n', ' ')).append('\n');
-        }
-        return sb.toString().trim();
     }
 
     private String render(String name, Map<String, String> vars) {

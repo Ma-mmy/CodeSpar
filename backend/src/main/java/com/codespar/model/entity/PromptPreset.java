@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
 
 /**
  * 出题提示词预设。
- * <p>params_json 存题型数量/难度/标签/语言/去重等快照（不含模型，模型随用户当前配置选）。
+ * <p>params_json 存题型数量/难度/标签/语言等快照（不含模型，模型随用户当前配置选）。
  * builtin=true 为内置起步预设，不可删除、不可改名。
  */
 @Data

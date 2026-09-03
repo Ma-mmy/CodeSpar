@@ -1,5 +1,5 @@
 import { api } from './client'
-import type { DedupStrength, Difficulty, QuestionType } from './generation'
+import type { Difficulty, QuestionType } from './generation'
 
 export interface PresetParams {
   counts?: Partial<Record<QuestionType, number>>
@@ -7,7 +7,6 @@ export interface PresetParams {
   tags?: string[]
   category?: string
   language?: string
-  dedupStrength?: DedupStrength
 }
 
 export interface PromptPreset {

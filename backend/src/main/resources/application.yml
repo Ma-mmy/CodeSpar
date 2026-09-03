@@ -89,7 +89,8 @@ codespar:
   public-origin: ${CODESPAR_PUBLIC_ORIGIN:}
   access:
     # 系统默认口令。设置页改过之后以 hash-file 为准，此项不再覆盖。
-    password: ${CODESPAR_ACCESS_PASSWORD:}
+    # 此项不要修改，就保持明文即可
+    password: ma123456
     hash-file: ${CODESPAR_ACCESS_HASH_FILE:${user.home}/.codespar/access.hash}
     login-max-failures: 5
     login-window-sec: 600

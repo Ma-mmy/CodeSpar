@@ -8,7 +8,6 @@ import com.codespar.model.dto.PromptPresetDTO.Rename;
 import com.codespar.model.dto.PromptPresetDTO.Upsert;
 import com.codespar.model.dto.PromptPresetDTO.View;
 import com.codespar.model.entity.PromptPreset;
-import com.codespar.model.enums.DedupStrength;
 import com.codespar.model.enums.QuestionDifficulty;
 import com.codespar.model.enums.QuestionType;
 import com.codespar.web.ApiExceptionHandler.BizException;
@@ -159,9 +158,6 @@ public class PromptPresetService {
         if (p.getLanguage() == null || p.getLanguage().isBlank()) {
             p.setLanguage("zh");
         }
-        if (p.getDedupStrength() == null) {
-            p.setDedupStrength(DedupStrength.STANDARD);
-        }
         if (p.getCounts() == null) {
             p.setCounts(Map.of());
         }
@@ -203,7 +199,7 @@ public class PromptPresetService {
                                 QuestionDifficulty.ADVANCED,
                                 List.of("Agent"),
                                 "AGENT",
-                                "zh", DedupStrength.STANDARD)),
+                                "zh")),
                 new Builtin(
                         "RAG 工程实战专项",
                         "围绕生产级 RAG 系统的检索质量优化出题。重点考察召回率与精确率的取舍、chunk 策略、rerank、混合检索、索引更新与数据新鲜度、评测与线上故障排查。题目贴近真实故障场景，不要考背诵定义。",
@@ -215,7 +211,7 @@ public class PromptPresetService {
                                 QuestionDifficulty.ADVANCED,
                                 List.of("RAG"),
                                 "RAG",
-                                "zh", DedupStrength.STANDARD)),
+                                "zh")),
                 new Builtin(
                         "LLM 基础八股速刷",
                         "出一套 LLM / Agent 方向的基础客观题速刷卷。覆盖 Transformer 要点、上下文窗口、温度与采样、常见幻觉原因、基础 RAG 概念、Function Calling 基本用法。题干简洁，适合考前快速过一遍，控制 token。",
@@ -226,7 +222,7 @@ public class PromptPresetService {
                                 QuestionDifficulty.INTERMEDIATE,
                                 List.of("LLM基础"),
                                 "LLM_BASICS",
-                                "zh", DedupStrength.STANDARD)),
+                                "zh")),
                 new Builtin(
                         "Multi-Agent 协作与通信",
                         "围绕 Multi-Agent 协作与通信出题。重点考察任务分解与委派、共享状态与消息协议、冲突消解与仲裁、角色分工、并行与串行编排、失败重试与人机回环。要求贴近真实多 Agent 产品设计。",
@@ -238,7 +234,7 @@ public class PromptPresetService {
                                 QuestionDifficulty.ADVANCED,
                                 List.of("Multi-Agent"),
                                 "MULTI_AGENT",
-                                "zh", DedupStrength.STANDARD)),
+                                "zh")),
                 new Builtin(
                         "模拟真实面试轮",
                         "模拟一轮约 60 分钟的 Agent / LLM 应用工程师技术面。混合题型：先热身客观题，再概念问答，最后一道系统设计。难度偏高级，考察表达清晰度与工程权衡，不要出偏题怪题。",
@@ -250,7 +246,7 @@ public class PromptPresetService {
                                 QuestionDifficulty.ADVANCED,
                                 List.of("面试综合"),
                                 "INTERVIEW",
-                                "zh", DedupStrength.STANDARD))
+                                "zh"))
         );
     }
 
@@ -258,15 +254,13 @@ public class PromptPresetService {
                                  QuestionDifficulty difficulty,
                                  List<String> tags,
                                  String category,
-                                 String language,
-                                 DedupStrength dedup) {
+                                 String language) {
         Params p = new Params();
         p.setCounts(new LinkedHashMap<>(counts));
         p.setDifficulty(difficulty);
         p.setTags(tags);
         p.setCategory(category);
         p.setLanguage(language);
-        p.setDedupStrength(dedup);
         return p;
     }
 

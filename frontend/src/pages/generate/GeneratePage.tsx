@@ -36,12 +36,10 @@ import {
 import { api } from '@/api/client'
 import { modelsApi } from '@/api/models'
 import {
-  DEDUP_STRENGTHS,
   DIFFICULTIES,
   QUESTION_TYPES,
   QUESTION_TYPE_ORDER,
   generationApi,
-  type DedupStrength,
   type Difficulty,
   type GenerateRequest,
   type QuestionType,
@@ -50,6 +48,7 @@ import { categoriesApi } from '@/api/categories'
 import { presetsApi, type PromptPreset } from '@/api/presets'
 import { TagInput } from './TagInput'
 import {
+  DEFAULT_COUNT_PRESET,
   MAX_QUESTIONS_PER_TYPE,
   clampCounts,
   clearLegacyLocalPreset,
@@ -71,7 +70,6 @@ export type GeneratePrefillState = {
   tags?: string[]
   modelProfileId?: number
   language?: 'zh' | 'en'
-  dedupStrength?: DedupStrength
   autoOptimize?: boolean
   /** 从出题预览「返回修改」带回时带上任务 id，用于提示文案 */
   fromJobId?: number
@@ -129,7 +127,7 @@ export function GeneratePage() {
   const [articleId, setArticleId] = useState<number | undefined>(prefill.articleId)
   const [articleTitle, setArticleTitle] = useState<string | undefined>(prefill.articleTitle)
   const [counts, setCounts] = useState<Partial<Record<QuestionType, number>>>(() =>
-    prefill.counts ? clampCounts(prefill.counts) : {},
+    prefill.counts ? clampCounts(prefill.counts) : { ...DEFAULT_COUNT_PRESET },
   )
   const [countsTouched, setCountsTouched] = useState(false)
   const migratedLegacy = useRef(false)
@@ -141,7 +139,6 @@ export function GeneratePage() {
   const [language, setLanguage] = useState<'zh' | 'en'>(
     prefill.language === 'en' || prefill.language === 'zh' ? prefill.language : 'zh',
   )
-  const [dedupStrength, setDedupStrength] = useState<DedupStrength>(prefill.dedupStrength ?? 'STANDARD')
   /** 生成试卷时是否自动优化提示词；默认开。点「优化描述」后会关掉。 */
   const [autoOptimize, setAutoOptimize] = useState(prefill.autoOptimize ?? true)
   const [loadedPresetId, setLoadedPresetId] = useState<number | undefined>()
@@ -162,7 +159,6 @@ export function GeneratePage() {
       state.category != null ||
       state.modelProfileId != null ||
       state.language != null ||
-      state.dedupStrength != null ||
       state.autoOptimize != null ||
       state.fromJobId != null
     if (!hasPrefill) return
@@ -189,6 +185,14 @@ export function GeneratePage() {
     () => resolvedCountPreset(countPresetView?.counts),
     [countPresetView],
   )
+  // 无预填、未手改、未载入提示词预设时，用服务端题型预设（或内置默认）填入。
+  useEffect(() => {
+    if (prefill.counts) return
+    if (countsTouched) return
+    if (loadedPresetId != null) return
+    if (!countPresetView) return
+    setCounts((prev) => (countsEqual(prev, countPreset) ? prev : { ...countPreset }))
+  }, [countPreset, countPresetView, countsTouched, loadedPresetId, prefill.counts])
   const total = QUESTION_TYPE_ORDER.reduce((s, t) => s + (counts[t] ?? 0), 0)
   const selectedModelId = modelId ?? defaultModel?.id
   const loadedPreset = (presets ?? []).find((p) => p.id === loadedPresetId)
@@ -208,7 +212,6 @@ export function GeneratePage() {
     setTags(p.params.tags ?? [])
     setCategory(p.params.category ?? '')
     if (p.params.language === 'en' || p.params.language === 'zh') setLanguage(p.params.language)
-    if (p.params.dedupStrength) setDedupStrength(p.params.dedupStrength)
     toast(`已载入「${p.name}」`, { variant: 'success' })
   }
 
@@ -225,7 +228,6 @@ export function GeneratePage() {
           tags: tags.map((t) => t.trim()).filter(Boolean),
           category: category || undefined,
           language,
-          dedupStrength,
         },
       }),
     onSuccess: (p) => {
@@ -357,7 +359,6 @@ export function GeneratePage() {
       category: category || undefined,
       modelProfileId: selectedModelId!,
       language,
-      dedupStrength,
       autoOptimize,
     })
   }
@@ -576,19 +577,9 @@ export function GeneratePage() {
           </div>
         </GlassCard>
 
-        {/* 标签 / 模型 / 语言 / 去重 */}
+        {/* 分类 / 模型 / 语言 / 标签 */}
         <GlassCard>
           <div className="grid gap-5 sm:grid-cols-2">
-            <div className="sm:col-span-2">
-              <Field label="知识点标签" description="留空则由模型自动为每题打标，用于后续弱项统计。">
-                {(id) => (
-                  <div id={id}>
-                    <TagInput value={tags} onChange={setTags} suggestions={tagNames ?? []} />
-                  </div>
-                )}
-              </Field>
-            </div>
-
             <Field
               label="主分类"
               description="可选。不选时由模型根据描述从已有分类中判断，必要时会新建（也可在设置里管理）。"
@@ -659,23 +650,11 @@ export function GeneratePage() {
               )}
             </Field>
 
-            <Field label="去重强度" description="把相关历史题干注入提示词，提示模型避开已出过的题。">
-              {() => (
-                <Select
-                  value={dedupStrength}
-                  onValueChange={(v) => setDedupStrength(v as DedupStrength)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(Object.keys(DEDUP_STRENGTHS) as DedupStrength[]).map((k) => (
-                      <SelectItem key={k} value={k}>
-                        {DEDUP_STRENGTHS[k]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            <Field label="知识点标签" description="留空则由模型自动为每题打标，用于后续弱项统计。">
+              {(id) => (
+                <div id={id}>
+                  <TagInput value={tags} onChange={setTags} suggestions={tagNames ?? []} />
+                </div>
               )}
             </Field>
           </div>
@@ -717,7 +696,7 @@ export function GeneratePage() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>另存为预设</DialogTitle>
-            <DialogDescription>保存当前提示词、题型数量、难度、标签、分类、语言与去重。</DialogDescription>
+            <DialogDescription>保存当前提示词、题型数量、难度、标签、分类与语言。</DialogDescription>
           </DialogHeader>
           <Field label="名称" required>
             {(id) => (

@@ -20,21 +20,4 @@ public interface QuestionTagMapper {
 
     @Select("SELECT tag_id FROM question_tag WHERE question_id = #{questionId}")
     List<Long> selectTagIdsByQuestionId(@Param("questionId") Long questionId);
-
-    /**
-     * 按标签取题目 id（去重上下文用），只算已确认入卷的题（ACTIVE）。
-     * tagIds 为已有标签的 id。
-     */
-    @Select("""
-            <script>
-            SELECT qt.question_id FROM question_tag qt
-            JOIN question q ON q.id = qt.question_id
-            WHERE qt.tag_id IN
-              <foreach collection='tagIds' item='t' open='(' separator=',' close=')'>#{t}</foreach>
-              AND q.status = 'ACTIVE'
-            ORDER BY qt.question_id DESC
-            LIMIT #{limit}
-            </script>
-            """)
-    List<Long> selectQuestionIdsByTagIds(@Param("tagIds") List<Long> tagIds, @Param("limit") int limit);
 }

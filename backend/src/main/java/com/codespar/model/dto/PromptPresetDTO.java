@@ -1,6 +1,5 @@
 package com.codespar.model.dto;
 
-import com.codespar.model.enums.DedupStrength;
 import com.codespar.model.enums.QuestionDifficulty;
 import com.codespar.model.enums.QuestionType;
 import jakarta.validation.constraints.NotBlank;
@@ -23,7 +22,6 @@ public class PromptPresetDTO {
         /** 主分类 code */
         private String category;
         private String language;
-        private DedupStrength dedupStrength;
     }
 
     @Data

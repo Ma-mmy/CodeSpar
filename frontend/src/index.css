@@ -390,6 +390,68 @@
   text-decoration: underline;
 }
 
+/* --------------------------------------------------------------------------
+   文章阅读器：仅 /articles 阅读区，不改题干/阅卷的紧排 markdown
+   -------------------------------------------------------------------------- */
+
+.article-reader .markdown-body {
+  max-width: 820px;
+  margin-inline: auto;
+  font-size: var(--article-font-size, 16px);
+  line-height: var(--article-line-height, 1.8);
+  overflow-wrap: break-word;
+}
+
+.article-reader .markdown-body h1,
+.article-reader .markdown-body h2,
+.article-reader .markdown-body h3,
+.article-reader .markdown-body h4 {
+  font-weight: 700;
+  scroll-margin-top: 1.25rem;
+  margin-top: 1.8em;
+  margin-bottom: 0.6em;
+}
+
+.article-reader .markdown-body h1 {
+  font-size: 1.5em;
+}
+
+.article-reader .markdown-body h2 {
+  font-size: 1.35em;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.article-reader .markdown-body h2::before {
+  content: "";
+  width: 4px;
+  height: 0.85em;
+  background: var(--primary);
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.article-reader .markdown-body h3,
+.article-reader .markdown-body h4 {
+  font-size: 1.12em;
+}
+
+.article-reader .markdown-body p {
+  margin: 0 0 1.25em;
+}
+
+.article-reader .markdown-body ul,
+.article-reader .markdown-body ol {
+  margin-bottom: 1.4em;
+}
+
+.article-reader .markdown-body li {
+  margin-bottom: 0.6em;
+}
+
 @layer base {
   * {
     border-color: var(--border);

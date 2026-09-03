@@ -55,7 +55,6 @@ function prefillFromJob(job: GenerationView): GeneratePrefillState {
     tags: p?.tags ?? [],
     modelProfileId: job.modelProfileId ?? p?.modelProfileId,
     language,
-    dedupStrength: p?.dedupStrength,
     autoOptimize: p?.autoOptimize,
     fromJobId: job.id,
   }
@@ -287,6 +286,7 @@ export function GenerateRunPage() {
               type: e.data.type as QuestionType,
               status: 'FAILED',
               errorMsg: String(e.data.error ?? ''),
+              ...(e.data.generated != null ? { generatedCount: Number(e.data.generated) } : {}),
             })
             break
           case 'progress':

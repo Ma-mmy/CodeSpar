@@ -31,12 +31,12 @@ public class QuestionBatchDTO {
         private String correctAnswer;
         /** 填空题：标准答案 + 可接受的同义表述 */
         private List<String> acceptedAnswers;
-        /** 参考答案（Markdown），也是复盘学习材料 */
+        /** 主观题参考答案（Markdown），也是复盘学习材料 */
         private String referenceAnswer;
         /** 评分要点，主观题必填，分值之和须等于 fullScore */
         private List<RubricPoint> rubric;
         private Integer fullScore;
-        /** 客观题答案解析 */
+        /** 客观题答案解析；主观题不要此字段 */
         private String explanation;
     }
 

@@ -26,7 +26,6 @@ import {
 } from '@/components/ui'
 import { categoriesApi } from '@/api/categories'
 import {
-  DEDUP_STRENGTHS,
   DIFFICULTIES,
   QUESTION_TYPES,
   QUESTION_TYPE_ORDER,
@@ -99,9 +98,6 @@ function JobCard({
             {job.modelSnapshot && <Badge variant="outline">{job.modelSnapshot}</Badge>}
             {job.params?.difficulty && (
               <Badge variant="outline">{DIFFICULTIES[job.params.difficulty]}</Badge>
-            )}
-            {job.params?.dedupStrength && (
-              <Badge variant="neutral">去重 {DEDUP_STRENGTHS[job.params.dedupStrength]}</Badge>
             )}
           </div>
           <p className="mt-2 text-sm leading-relaxed text-foreground">
@@ -224,7 +220,7 @@ export function GenerationsHistoryPage() {
     <PageContainer>
       <PageHeader
         title="出题历史"
-        description="每次出题任务一条记录。可查看生成结果，或用相同参数再来一次（自动带去重）。"
+        description="每次出题任务一条记录。可查看生成结果，或用相同参数再来一次。"
       />
 
       <div className="mb-4 flex flex-wrap items-center gap-3">

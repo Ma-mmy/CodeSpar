@@ -1,7 +1,6 @@
 package com.codespar.model.dto;
 
 import com.codespar.ai.QuestionBatchDTO;
-import com.codespar.model.enums.DedupStrength;
 import com.codespar.model.enums.QuestionDifficulty;
 import com.codespar.model.enums.QuestionType;
 import jakarta.validation.constraints.NotBlank;
@@ -45,8 +44,6 @@ public class GenerationDTO {
 
         /** zh / en */
         private String language = "zh";
-
-        private DedupStrength dedupStrength = DedupStrength.STANDARD;
 
         /**
          * 是否在出题流水线里自动跑「提示词优化」。
@@ -127,7 +124,6 @@ public class GenerationDTO {
         private String category;
         private Long modelProfileId;
         private String language;
-        private DedupStrength dedupStrength;
         /** null / true = 自动优化；false = 跳过 */
         private Boolean autoOptimize;
 
@@ -145,7 +141,6 @@ public class GenerationDTO {
                     ? null : req.getCategory().trim();
             p.modelProfileId = req.getModelProfileId();
             p.language = req.getLanguage();
-            p.dedupStrength = req.getDedupStrength();
             p.autoOptimize = req.getAutoOptimize() == null || Boolean.TRUE.equals(req.getAutoOptimize());
             return p;
         }

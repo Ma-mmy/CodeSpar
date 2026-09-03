@@ -32,7 +32,7 @@ public class GenerationJob {
     /** 来源文章（基于考点摘要出题）；可空 */
     private Long articleId;
 
-    /** 出题参数快照（题型数量/难度/标签/语言/去重强度），JSON 字符串 */
+    /** 出题参数快照（题型数量/难度/标签/语言），JSON 字符串 */
     private String paramsJson;
 
     private Long modelProfileId;

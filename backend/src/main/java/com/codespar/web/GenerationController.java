@@ -137,7 +137,7 @@ public class GenerationController {
         return ResponseEntity.noContent().build();
     }
 
-    /** 相同参数再来一次（自动带去重）。 */
+    /** 相同参数再来一次。 */
     @PostMapping("/generations/{id}/rerun")
     public Map<String, Object> rerun(@PathVariable Long id) {
         return Map.of("id", service.rerun(id));

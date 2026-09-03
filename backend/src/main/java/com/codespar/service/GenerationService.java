@@ -12,8 +12,6 @@ import com.codespar.mapper.ExamQuestionMapper;
 import com.codespar.mapper.GenerationBatchMapper;
 import com.codespar.mapper.GenerationJobMapper;
 import com.codespar.mapper.QuestionMapper;
-import com.codespar.mapper.QuestionTagMapper;
-import com.codespar.mapper.TagMapper;
 import com.codespar.mapper.WrongQuestionMapper;
 import com.codespar.model.dto.GenerationDTO;
 import com.codespar.model.dto.GenerationDTO.BatchResultView;
@@ -30,10 +28,7 @@ import com.codespar.model.entity.GenerationBatch;
 import com.codespar.model.entity.GenerationJob;
 import com.codespar.model.entity.ModelProfile;
 import com.codespar.model.entity.Question;
-import com.codespar.model.entity.Tag;
-import com.codespar.model.enums.DedupStrength;
 import com.codespar.model.enums.QuestionType;
-import com.codespar.service.QuestionSaver.QuestionDraft;
 import com.codespar.web.ApiExceptionHandler.BizException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -47,7 +42,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -76,8 +70,6 @@ public class GenerationService {
     private final GenerationJobMapper jobMapper;
     private final GenerationBatchMapper batchMapper;
     private final QuestionMapper questionMapper;
-    private final TagMapper tagMapper;
-    private final QuestionTagMapper questionTagMapper;
     private final ExamMapper examMapper;
     private final ExamQuestionMapper examQuestionMapper;
     private final WrongQuestionMapper wrongQuestionMapper;
@@ -107,8 +99,6 @@ public class GenerationService {
     public GenerationService(GenerationJobMapper jobMapper,
                              GenerationBatchMapper batchMapper,
                              QuestionMapper questionMapper,
-                             TagMapper tagMapper,
-                             QuestionTagMapper questionTagMapper,
                              ExamMapper examMapper,
                              ExamQuestionMapper examQuestionMapper,
                              WrongQuestionMapper wrongQuestionMapper,
@@ -129,8 +119,6 @@ public class GenerationService {
         this.jobMapper = jobMapper;
         this.batchMapper = batchMapper;
         this.questionMapper = questionMapper;
-        this.tagMapper = tagMapper;
-        this.questionTagMapper = questionTagMapper;
         this.examMapper = examMapper;
         this.examQuestionMapper = examQuestionMapper;
         this.wrongQuestionMapper = wrongQuestionMapper;
@@ -206,7 +194,7 @@ public class GenerationService {
     }
 
     /**
-     * 用相同参数再来一次（P6）：复制 prompt + params，自动带去重（沿用原 dedupStrength）。
+     * 用相同参数再来一次（P6）：复制 prompt + params。
      * 立即创建新任务并异步开跑，返回新 jobId。
      */
     public Long rerun(Long jobId) {
@@ -228,9 +216,6 @@ public class GenerationService {
         Long modelId = params.getModelProfileId() != null ? params.getModelProfileId() : src.getModelProfileId();
         req.setModelProfileId(modelId);
         req.setLanguage(params.getLanguage() == null ? "zh" : params.getLanguage());
-        req.setDedupStrength(params.getDedupStrength() == null
-                ? DedupStrength.STANDARD
-                : params.getDedupStrength());
         req.setArticleId(src.getArticleId());
         req.setAutoOptimize(params.shouldAutoOptimize());
         return create(req);
@@ -384,29 +369,23 @@ public class GenerationService {
             int existing = questionMapper.countByJobAndType(jobId, type);
             int need = Math.max(0, batch.getRequestedCount() - existing);
             if (need == 0) {
-                markBatch(batch, "SUCCESS", need, null, null);
+                markBatch(batch, "SUCCESS", existing, null, null);
                 refreshJobStatus(jobId);
                 hub.emit(jobId, "done", Map.of("status", jobMapper.selectById(jobId).getStatus()));
                 return;
             }
             GenerateParams params = parseParams(job);
             ChatModel model = modelFactory.get(modelService.getRequired(job.getModelProfileId()));
-            List<String> dedupStems = buildDedupContext(params);
             Counters counters = new Counters();
+            seedUsage(counters, job);
 
             hub.emit(jobId, "batch_started", Map.of("type", type.name(), "count", need));
-            markBatch(batch, "RUNNING", need, null, null);
+            markBatch(batch, "RUNNING", existing, null, null);
             String instruction = job.getOptimizedPrompt() != null && !job.getOptimizedPrompt().isBlank()
                     ? job.getOptimizedPrompt()
                     : job.getPrompt();
-            runOneBatch(jobId, type, need, params, instruction, model, dedupStems, counters);
+            runOneBatch(jobId, type, need, params, instruction, model, counters);
 
-            // 累加到 job 已有总量上（retry 是增量，不能覆盖）
-            jobMapper.updateProgress(jobId,
-                    job.getGeneratedCount() + counters.generated.get(),
-                    job.getPromptTokens() + counters.promptTokens.get(),
-                    job.getCompletionTokens() + counters.completionTokens.get(),
-                    job.getCostMs() + counters.costMs.get());
             refreshJobStatus(jobId);
             hub.emit(jobId, "done", Map.of("status", jobMapper.selectById(jobId).getStatus()));
         } finally {
@@ -548,7 +527,6 @@ public class GenerationService {
                 return;
             }
 
-            List<String> dedupStems = buildDedupContext(params);
             List<Map.Entry<QuestionType, Integer>> batches = params.getCounts().entrySet().stream()
                     .filter(e -> e.getValue() != null && e.getValue() > 0)
                     .sorted(Comparator.comparing(e -> e.getKey().name()))
@@ -569,18 +547,19 @@ public class GenerationService {
             List<CompletableFuture<String>> futures = batches.stream()
                     .map(b -> CompletableFuture.supplyAsync(() ->
                             runOneBatch(jobId, b.getKey(), b.getValue(), params, finalInstruction,
-                                    model, dedupStems, counters), generationExecutor))
+                                    model, counters), generationExecutor))
                     .toList();
             CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
 
             boolean cancelled = Boolean.TRUE.equals(cancelFlags.get(jobId));
             List<String> statuses = futures.stream().map(CompletableFuture::join).toList();
+            int generated = questionMapper.countByJobId(jobId);
             String status;
             if (cancelled) {
                 status = "CANCELLED";
             } else if (statuses.stream().allMatch("SUCCESS"::equals)) {
                 status = "SUCCESS";
-            } else if (statuses.stream().anyMatch("SUCCESS"::equals)) {
+            } else if (generated > 0) {
                 status = "PARTIAL";
             } else {
                 status = "FAILED";
@@ -589,7 +568,7 @@ public class GenerationService {
             GenerationJob update = new GenerationJob();
             update.setId(jobId);
             update.setStatus(status);
-            update.setGeneratedCount(counters.generated.get());
+            update.setGeneratedCount(generated);
             update.setPromptTokens(counters.promptTokens.get());
             update.setCompletionTokens(counters.completionTokens.get());
             update.setCostMs(counters.costMs.get());
@@ -599,10 +578,10 @@ public class GenerationService {
 
             hub.emit(jobId, "done", Map.of(
                     "status", status,
-                    "generated", counters.generated.get(),
+                    "generated", generated,
                     "errorMsg", Objects.toString(counters.errorMsg(), "")));
             log.info("出题任务 {} 完成：{}，生成 {} 题，{}ms", jobId, status,
-                    counters.generated.get(), counters.costMs.get());
+                    generated, counters.costMs.get());
         } catch (Exception e) {
             log.error("出题任务 {} 异常", jobId, e);
             GenerationJob update = new GenerationJob();
@@ -822,84 +801,97 @@ public class GenerationService {
     }
 
     /**
-     * 跑一个题型批次：调模型 → 宽松解析 → 校验 → 失败回灌重试 → 落库。
+     * 跑一个题型批次：调模型 → 收下能过校验的题 → 差额回灌重试。
      * 内部捕获一切异常，绝不向上抛（保证各批互不影响、任务最终有终态）。
      */
     private String runOneBatch(Long jobId, QuestionType type, int count, GenerateParams params,
-                               String instruction, ChatModel model, List<String> dedupStems,
-                               Counters counters) {
+                               String instruction, ChatModel model, Counters counters) {
         long start = System.nanoTime();
         if (isCancelled(jobId)) {
             return markCancelled(jobId, type);
         }
         hub.emit(jobId, "batch_started", Map.of("type", type.name(), "count", count));
-        markBatch(jobId, type, "RUNNING", count, null, null);
+        markBatch(jobId, type, "RUNNING", questionMapper.countByJobAndType(jobId, type), null, null);
 
-        String initialPrompt = promptBuilder.buildGenerate(params, instruction, type, count, dedupStems);
+        int remaining = count;
         String error = null;
         String rawOutput = null;
 
         try {
-            for (int attempt = 0; attempt <= maxParseRetries; attempt++) {
+            for (int attempt = 0; attempt <= maxParseRetries && remaining > 0; attempt++) {
                 if (isCancelled(jobId)) {
                     return markCancelled(jobId, type);
                 }
-                String prompt = attempt == 0 ? initialPrompt
-                        : promptBuilder.buildFix(type, count, error, rawOutput);
+                String prompt = attempt == 0
+                        ? promptBuilder.buildGenerate(params, instruction, type, remaining)
+                        : promptBuilder.buildFix(type, remaining, refillError(jobId, type, remaining, error), rawOutput);
                 ChatResponse resp = callModel(model, prompt);
                 rawOutput = extractText(resp);
                 accumulateUsage(counters, resp);
 
-                try {
-                    List<QuestionDraft> drafts = parseAndConvert(rawOutput, jobId, type, params);
-                    questionSaver.saveDraft(drafts);
-                    counters.generated.addAndGet(drafts.size());
-                    counters.costMs.addAndGet(elapsedMs(start));
-                    jobMapper.updateProgress(jobId, counters.generated.get(),
-                            counters.promptTokens.get(), counters.completionTokens.get(), counters.costMs.get());
-                    markBatch(jobId, type, "SUCCESS", drafts.size(), null, null);
-                    hub.emit(jobId, "batch_done", Map.of(
-                            "type", type.name(),
-                            "generated", drafts.size(),
-                            "promptTokens", counters.promptTokens.get(),
-                            "completionTokens", counters.completionTokens.get()));
-                    hub.emit(jobId, "progress", liveProgress(jobId, counters));
-                    return "SUCCESS";
-                } catch (Exception ex) {
-                    // 解析或校验失败 → 回灌重试
-                    error = truncate(ex.getMessage(), 800);
+                QuestionDraftAcceptance.Result accepted = acceptValidDrafts(
+                        rawOutput, jobId, type, params, remaining);
+                if (accepted.isEmpty()) {
+                    error = accepted.error();
+                    persistProgress(jobId, counters);
+                    continue;
+                }
+                questionSaver.saveDraft(accepted.drafts());
+                counters.generated.addAndGet(accepted.drafts().size());
+                remaining -= accepted.drafts().size();
+                persistProgress(jobId, counters);
+                markBatch(jobId, type, "RUNNING", questionMapper.countByJobAndType(jobId, type), null, null);
+                hub.emit(jobId, "progress", liveProgress(jobId, counters));
+                if (remaining > 0) {
+                    error = accepted.error();
                 }
             }
 
-            // 重试耗尽
             counters.costMs.addAndGet(elapsedMs(start));
-            jobMapper.updateProgress(jobId, counters.generated.get(),
-                    counters.promptTokens.get(), counters.completionTokens.get(), counters.costMs.get());
-            markBatch(jobId, type, "FAILED", 0, error, rawOutput);
+            persistProgress(jobId, counters);
+            int generated = questionMapper.countByJobAndType(jobId, type);
+            if (remaining == 0) {
+                markBatch(jobId, type, "SUCCESS", generated, null, null);
+                hub.emit(jobId, "batch_done", Map.of(
+                        "type", type.name(),
+                        "generated", generated,
+                        "promptTokens", counters.promptTokens.get(),
+                        "completionTokens", counters.completionTokens.get()));
+                hub.emit(jobId, "progress", liveProgress(jobId, counters));
+                return "SUCCESS";
+            }
+            markBatch(jobId, type, "FAILED", generated, error, rawOutput);
             counters.failures.add(new BatchFailure(type, error, rawOutput));
-            hub.emit(jobId, "batch_failed", Map.of("type", type.name(), "error", error));
+            hub.emit(jobId, "batch_failed", Map.of(
+                    "type", type.name(),
+                    "error", Objects.toString(error, ""),
+                    "generated", generated));
             hub.emit(jobId, "progress", liveProgress(jobId, counters));
             return "FAILED";
         } catch (Exception e) {
             // model.call 抛异常（网络/超时/模型错误）
             error = truncate(e.toString(), 800);
             counters.costMs.addAndGet(elapsedMs(start));
-            jobMapper.updateProgress(jobId, counters.generated.get(),
-                    counters.promptTokens.get(), counters.completionTokens.get(), counters.costMs.get());
-            markBatch(jobId, type, "FAILED", 0, error, rawOutput);
+            persistProgress(jobId, counters);
+            int generated = questionMapper.countByJobAndType(jobId, type);
+            markBatch(jobId, type, "FAILED", generated, error, rawOutput);
             counters.failures.add(new BatchFailure(type, error, rawOutput));
-            hub.emit(jobId, "batch_failed", Map.of("type", type.name(), "error", error));
+            hub.emit(jobId, "batch_failed", Map.of(
+                    "type", type.name(),
+                    "error", error,
+                    "generated", generated));
             hub.emit(jobId, "progress", liveProgress(jobId, counters));
             return "FAILED";
         }
     }
 
     private String markCancelled(Long jobId, QuestionType type) {
+        int generated = questionMapper.countByJobAndType(jobId, type);
         GenerationBatch batch = batchMapper.selectByJobAndType(jobId, type);
         if (batch != null) {
-            markBatch(batch, "CANCELLED", 0, null, null);
+            markBatch(batch, "CANCELLED", generated, null, null);
         }
-        hub.emit(jobId, "batch_failed", Map.of("type", type.name(), "error", "已取消"));
+        hub.emit(jobId, "batch_failed", Map.of("type", type.name(), "error", "已取消", "generated", generated));
         return "CANCELLED";
     }
 
@@ -907,23 +899,42 @@ public class GenerationService {
         return Boolean.TRUE.equals(cancelFlags.get(jobId));
     }
 
-    /** 解析 + 校验 + 转实体（含合并用户标签）。任一道不合格即抛，整批重试。 */
-    private List<QuestionDraft> parseAndConvert(String raw, Long jobId, QuestionType expectedType,
-                                                GenerateParams params) {
-        QuestionBatchDTO.Batch batch = jsonParser.parse(raw, QuestionBatchDTO.Batch.class);
-        if (batch.getQuestions() == null || batch.getQuestions().isEmpty()) {
-            throw new IllegalStateException("模型没有返回任何题目");
-        }
-        List<QuestionDraft> drafts = new ArrayList<>();
-        for (QuestionBatchDTO.QuestionDTO dto : batch.getQuestions()) {
-            Question q = converter.toEntity(expectedType, dto);
-            q.setJobId(jobId);
+    /** 解析 JSON，逐题校验，只收下合格的（上限 remaining）。整段 JSON 坏掉则 0 道。 */
+    private QuestionDraftAcceptance.Result acceptValidDrafts(String raw, Long jobId, QuestionType expectedType,
+                                                             GenerateParams params, int remaining) {
+        try {
+            QuestionBatchDTO.Batch batch = jsonParser.parse(raw, QuestionBatchDTO.Batch.class);
             String fallbackLabel = params.getCategory() == null || params.getCategory().isBlank()
                     ? null : categoryService.labelOf(params.getCategory());
-            List<String> tags = converter.mergeTags(dto.getTags(), params.getTags(), fallbackLabel);
-            drafts.add(new QuestionDraft(q, tags));
+            return QuestionDraftAcceptance.accept(
+                    batch.getQuestions(), converter, jobId, expectedType, params, fallbackLabel, remaining);
+        } catch (Exception e) {
+            return new QuestionDraftAcceptance.Result(List.of(), truncate(e.getMessage(), 800));
         }
-        return drafts;
+    }
+
+    /** 差额补生成时告诉模型还缺几道、别重复已收下的题干。 */
+    private String refillError(Long jobId, QuestionType type, int remaining, String error) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("请再生成 ").append(remaining).append(" 道").append(PromptBuilder.typeLabel(type)).append("。");
+        List<String> stems = questionMapper.selectByJobId(jobId).stream()
+                .filter(q -> q.getType() == type && q.getStem() != null && !q.getStem().isBlank())
+                .map(q -> {
+                    String s = q.getStem().replace('\n', ' ');
+                    return s.length() > 80 ? s.substring(0, 80) + "…" : s;
+                })
+                .limit(15)
+                .toList();
+        if (!stems.isEmpty()) {
+            sb.append("已收下、不要重复的题干：");
+            for (int i = 0; i < stems.size(); i++) {
+                sb.append(i + 1).append(". ").append(stems.get(i)).append("；");
+            }
+        }
+        if (error != null && !error.isBlank()) {
+            sb.append("上次不合格原因：").append(error);
+        }
+        return truncate(sb.toString(), 800);
     }
 
     /** 调模型（Semaphore 限并发）。 */
@@ -970,36 +981,6 @@ public class GenerationService {
             update.setStatus("FAILED");
         }
         jobMapper.updateById(update);
-    }
-
-    /** 去重上下文（PRD F3.2 事前防线）：相关历史题干摘要，注入各批 prompt。 */
-    private List<String> buildDedupContext(GenerateParams params) {
-        DedupStrength strength = params.getDedupStrength();
-        if (strength == null || strength == DedupStrength.OFF) {
-            return List.of();
-        }
-        int limit = strength == DedupStrength.STRICT ? 15 : 8;
-        List<String> tags = cleanTags(params.getTags());
-        if (tags.isEmpty()) {
-            return questionMapper.selectRecentActive(limit).stream().map(Question::getStem).toList();
-        }
-        List<Long> tagIds = tagMapper.selectList(Wrappers.<Tag>lambdaQuery().in(Tag::getName, tags))
-                .stream().map(Tag::getId).toList();
-        if (tagIds.isEmpty()) {
-            return questionMapper.selectRecentActive(limit).stream().map(Question::getStem).toList();
-        }
-        List<Long> qids = questionTagMapper.selectQuestionIdsByTagIds(tagIds, limit);
-        if (qids.isEmpty()) {
-            return List.of();
-        }
-        return questionMapper.selectBatchIds(qids).stream().map(Question::getStem).toList();
-    }
-
-    private static List<String> cleanTags(List<String> tags) {
-        if (tags == null) {
-            return List.of();
-        }
-        return tags.stream().filter(t -> t != null && !t.isBlank()).map(String::trim).distinct().toList();
     }
 
     private GenerateParams parseParams(GenerationJob job) {
@@ -1052,12 +1033,29 @@ public class GenerationService {
     private Map<String, Object> liveProgress(Long jobId, Counters counters) {
         GenerationJob job = jobMapper.selectById(jobId);
         Map<String, Object> m = new LinkedHashMap<>();
-        m.put("generated", counters.generated.get());
+        m.put("generated", questionMapper.countByJobId(jobId));
         m.put("requested", job.getRequestedCount());
         m.put("promptTokens", counters.promptTokens.get());
         m.put("completionTokens", counters.completionTokens.get());
         m.put("costMs", counters.costMs.get());
         return m;
+    }
+
+    private void persistProgress(Long jobId, Counters counters) {
+        jobMapper.updateProgress(jobId, questionMapper.countByJobId(jobId),
+                counters.promptTokens.get(), counters.completionTokens.get(), counters.costMs.get());
+    }
+
+    private static void seedUsage(Counters counters, GenerationJob job) {
+        if (job.getPromptTokens() != null) {
+            counters.promptTokens.set(job.getPromptTokens());
+        }
+        if (job.getCompletionTokens() != null) {
+            counters.completionTokens.set(job.getCompletionTokens());
+        }
+        if (job.getCostMs() != null) {
+            counters.costMs.set(job.getCostMs());
+        }
     }
 
     private String toJson(Object value) {

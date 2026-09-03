@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { Loader2, Pencil } from 'lucide-react'
+import { BookOpen, Loader2, Pencil } from 'lucide-react'
 import {
   Badge,
   Button,
@@ -11,26 +11,12 @@ import {
   Textarea,
   useToast,
 } from '@/components/ui'
-import { Markdown } from '@/components/Markdown'
 import {
   articlesApi,
   type ArticleDetail,
-  type ArticleSummaryStructured,
 } from '@/api/articles'
-import { BookOpen } from 'lucide-react'
-
-function parseStructured(raw: unknown): ArticleSummaryStructured | null {
-  if (!raw) return null
-  if (typeof raw === 'string') {
-    try {
-      return JSON.parse(raw) as ArticleSummaryStructured
-    } catch {
-      return null
-    }
-  }
-  if (typeof raw === 'object') return raw as ArticleSummaryStructured
-  return null
-}
+import { ArticleMarkdown } from './ArticleMarkdown'
+import { parseSummaryStructured, SUMMARY_TOC } from './headings'
 
 export function SummaryPanel({
   article,
@@ -40,7 +26,7 @@ export function SummaryPanel({
   onUpdated: (a: ArticleDetail) => void
 }) {
   const toast = useToast()
-  const structured = useMemo(() => parseStructured(article.summaryJson), [article.summaryJson])
+  const structured = useMemo(() => parseSummaryStructured(article.summaryJson), [article.summaryJson])
   const [editing, setEditing] = useState(false)
   const [md, setMd] = useState(article.summaryMd ?? '')
   const [sections, setSections] = useState(structured?.sections ?? [])
@@ -50,7 +36,7 @@ export function SummaryPanel({
   useEffect(() => {
     if (!editing) {
       setMd(article.summaryMd ?? '')
-      const s = parseStructured(article.summaryJson)
+      const s = parseSummaryStructured(article.summaryJson)
       setSections(s?.sections ?? [])
       setKeypoints(s?.keypoints ?? [])
       setQuestions(s?.classicQuestions ?? [])
@@ -116,89 +102,101 @@ export function SummaryPanel({
 
       {editing ? (
         <div className="space-y-4">
-          <Field label="可读 Markdown">
-            {(id) => (
-              <Textarea
-                id={id}
-                value={md}
-                onChange={(e) => setMd(e.target.value)}
-                className="min-h-[180px] font-mono text-sm"
-              />
-            )}
-          </Field>
+          <div id={SUMMARY_TOC.markdown} className="scroll-mt-4">
+            <Field label="可读 Markdown">
+              {(id) => (
+                <Textarea
+                  id={id}
+                  value={md}
+                  onChange={(e) => setMd(e.target.value)}
+                  className="min-h-[180px] font-mono text-sm"
+                />
+              )}
+            </Field>
+          </div>
 
-          <StructuredEditor
-            title="章节切片"
-            items={sections}
-            onChange={setSections}
-            fields={[
-              { key: 'title', label: '标题' },
-              { key: 'summary', label: '要点', multiline: true },
-            ]}
-            onAdd={() => setSections((s) => [...s, { title: '', summary: '' }])}
-          />
-          <StructuredEditor
-            title="高频考点"
-            items={keypoints}
-            onChange={setKeypoints}
-            fields={[
-              { key: 'title', label: '考点' },
-              { key: 'detail', label: '说明', multiline: true },
-              { key: 'importance', label: '重要度' },
-            ]}
-            onAdd={() => setKeypoints((s) => [...s, { title: '', detail: '', importance: 'MEDIUM' }])}
-          />
-          <StructuredEditor
-            title="经典问题"
-            items={questions}
-            onChange={setQuestions}
-            fields={[
-              { key: 'question', label: '问题', multiline: true },
-              { key: 'angle', label: '角度' },
-              { key: 'hint', label: '提示' },
-            ]}
-            onAdd={() => setQuestions((s) => [...s, { question: '', angle: '', hint: '' }])}
-          />
+          <div id={SUMMARY_TOC.sections} className="scroll-mt-4">
+            <StructuredEditor
+              title="章节切片"
+              items={sections}
+              onChange={setSections}
+              fields={[
+                { key: 'title', label: '标题' },
+                { key: 'summary', label: '要点', multiline: true },
+              ]}
+              onAdd={() => setSections((s) => [...s, { title: '', summary: '' }])}
+            />
+          </div>
+          <div id={SUMMARY_TOC.keypoints} className="scroll-mt-4">
+            <StructuredEditor
+              title="高频考点"
+              items={keypoints}
+              onChange={setKeypoints}
+              fields={[
+                { key: 'title', label: '考点' },
+                { key: 'detail', label: '说明', multiline: true },
+                { key: 'importance', label: '重要度' },
+              ]}
+              onAdd={() => setKeypoints((s) => [...s, { title: '', detail: '', importance: 'MEDIUM' }])}
+            />
+          </div>
+          <div id={SUMMARY_TOC.questions} className="scroll-mt-4">
+            <StructuredEditor
+              title="经典问题"
+              items={questions}
+              onChange={setQuestions}
+              fields={[
+                { key: 'question', label: '问题', multiline: true },
+                { key: 'angle', label: '角度' },
+                { key: 'hint', label: '提示' },
+              ]}
+              onAdd={() => setQuestions((s) => [...s, { question: '', angle: '', hint: '' }])}
+            />
+          </div>
         </div>
       ) : (
         <div className="space-y-4">
           {(structured?.sections?.length ?? 0) > 0 && (
-            <section className="space-y-2">
+            <section id={SUMMARY_TOC.sections} className="scroll-mt-4 space-y-2">
               <h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">章节切片</h4>
               <div className="grid gap-2 sm:grid-cols-2">
                 {structured!.sections!.map((s, i) => (
-                  <GlassCard key={i} className="!p-3">
-                    <div className="text-sm font-medium">{s.title || `切片 ${i + 1}`}</div>
-                    {s.summary && <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">{s.summary}</p>}
-                  </GlassCard>
+                  <div key={i} id={SUMMARY_TOC.section(i)} className="scroll-mt-4">
+                    <GlassCard className="!p-3">
+                      <div className="text-sm font-medium">{s.title || `切片 ${i + 1}`}</div>
+                      {s.summary && <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">{s.summary}</p>}
+                    </GlassCard>
+                  </div>
                 ))}
               </div>
             </section>
           )}
 
           {(structured?.keypoints?.length ?? 0) > 0 && (
-            <section className="space-y-2">
+            <section id={SUMMARY_TOC.keypoints} className="scroll-mt-4 space-y-2">
               <h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">高频考点</h4>
               <div className="space-y-2">
                 {structured!.keypoints!.map((k, i) => (
-                  <GlassCard key={i} className="!p-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-sm font-medium">{k.title || `考点 ${i + 1}`}</span>
-                      {k.importance && <Badge variant="neutral">{k.importance}</Badge>}
-                    </div>
-                    {k.detail && <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">{k.detail}</p>}
-                  </GlassCard>
+                  <div key={i} id={SUMMARY_TOC.keypoint(i)} className="scroll-mt-4">
+                    <GlassCard className="!p-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-medium">{k.title || `考点 ${i + 1}`}</span>
+                        {k.importance && <Badge variant="neutral">{k.importance}</Badge>}
+                      </div>
+                      {k.detail && <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">{k.detail}</p>}
+                    </GlassCard>
+                  </div>
                 ))}
               </div>
             </section>
           )}
 
           {(structured?.classicQuestions?.length ?? 0) > 0 && (
-            <section className="space-y-2">
+            <section id={SUMMARY_TOC.questions} className="scroll-mt-4 space-y-2">
               <h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">经典问题</h4>
               <ol className="space-y-2">
                 {structured!.classicQuestions!.map((q, i) => (
-                  <li key={i}>
+                  <li key={i} id={SUMMARY_TOC.question(i)} className="scroll-mt-4">
                     <GlassCard className="!p-3">
                       <div className="flex flex-wrap items-center gap-2 text-sm font-medium">
                         <span className="text-muted-foreground">{i + 1}.</span>
@@ -214,10 +212,10 @@ export function SummaryPanel({
           )}
 
           {article.summaryMd && (
-            <section className="space-y-2">
+            <section id={SUMMARY_TOC.markdown} className="scroll-mt-4 space-y-2">
               <h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">完整 Markdown</h4>
               <GlassCard className="!p-4">
-                <Markdown>{article.summaryMd}</Markdown>
+                <ArticleMarkdown idPrefix={SUMMARY_TOC.mdPrefix}>{article.summaryMd}</ArticleMarkdown>
               </GlassCard>
             </section>
           )}

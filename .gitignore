@@ -19,4 +19,4 @@ frontend/.vite/
 
 # macOS
 .DS_Store
-.codespar
+/.codespar/

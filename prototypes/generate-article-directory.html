@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CodeSpar - 出题文章目录原型</title>
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    :root {
+      color-scheme: light;
+      --bg: #f4f5f8;
+      --panel: rgba(255,255,255,.82);
+      --solid: #fff;
+      --text: #20232c;
+      --muted: #6f7480;
+      --border: #e3e5ea;
+      --primary: #515bd4;
+      --primary-soft: #eef0ff;
+      --green: #23845d;
+      --amber: #a65f12;
+      --danger: #b43b3b;
+      --shadow: 0 10px 30px rgba(31,35,48,.08);
+    }
+    body { margin: 0; min-width: 320px; min-height: 100vh; background: var(--bg); color: var(--text); font: 14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif; }
+    button,input { font: inherit; }
+    button { color: inherit; }
+    .app { display: grid; grid-template-columns: 224px minmax(0,1fr); min-height: 100vh; }
+    .sidebar { position: sticky; top: 0; height: 100vh; padding: 20px 14px; border-right: 1px solid var(--border); background: rgba(255,255,255,.68); backdrop-filter: blur(18px); }
+    .brand { display: flex; align-items: center; gap: 10px; padding: 0 10px 24px; font-weight: 700; font-size: 16px; }
+    .brand-mark { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 8px; background: var(--primary); color: #fff; }
+    .brand small { display: block; color: var(--muted); font-size: 11px; font-weight: 400; }
+    .nav { display: grid; gap: 4px; }
+    .nav-item { display: flex; align-items: center; gap: 11px; padding: 9px 12px; border-radius: 8px; color: var(--muted); }
+    .nav-item.active { background: var(--solid); color: var(--text); box-shadow: 0 2px 8px rgba(31,35,48,.06); }
+    .nav-item.active::before { content:""; width: 3px; height: 18px; margin-left: -12px; border-radius: 0 3px 3px 0; background: var(--primary); }
+    .main { min-width: 0; padding: 34px clamp(20px,4vw,56px) 64px; }
+    .content { max-width: 1160px; margin: auto; }
+    .page-head { margin-bottom: 24px; }
+    h1 { margin: 0; font-size: 26px; letter-spacing: 0; }
+    .page-head p { margin: 5px 0 0; color: var(--muted); }
+    .section { margin-bottom: 18px; overflow: visible; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); box-shadow: var(--shadow); backdrop-filter: blur(16px); }
+    .section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 56px; padding: 11px 14px 11px 18px; border-bottom: 1px solid var(--border); }
+    .section-title { font-size: 14px; font-weight: 650; }
+    .section-sub { margin-left: 8px; color: var(--muted); font-size: 12px; font-weight: 400; }
+    .source-grid { display: grid; grid-template-columns: minmax(360px,1.1fr) minmax(300px,.9fr); min-height: 420px; }
+    .browser { min-width: 0; border-right: 1px solid var(--border); }
+    .browser-tools { position: relative; display: flex; align-items: center; gap: 6px; min-height: 49px; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+    .breadcrumbs { display: flex; min-width: 0; flex: 1; align-items: center; gap: 3px; overflow: hidden; }
+    .crumb { flex: 0 1 auto; overflow: hidden; padding: 4px 5px; border: 0; background: none; color: var(--muted); text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+    .crumb.current { color: var(--text); font-weight: 600; cursor: default; }
+    .crumb-sep { color: #b3b6bf; }
+    .tool-group { position: relative; display: flex; gap: 4px; }
+    .icon-btn { position: relative; display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 1px solid transparent; border-radius: 7px; background: transparent; cursor: pointer; }
+    .icon-btn:hover,.icon-btn.on { border-color: var(--border); background: var(--solid); }
+    .filter-count { position: absolute; right: -3px; top: -4px; min-width: 16px; height: 16px; padding: 0 4px; border: 2px solid var(--solid); border-radius: 9px; background: var(--primary); color: #fff; font-size: 9px; line-height: 12px; }
+    .popover { position: absolute; right: 0; top: 42px; z-index: 20; display: none; width: 280px; padding: 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--solid); box-shadow: 0 16px 40px rgba(24,27,38,.18); }
+    .popover.open { display: block; }
+    .menu-option { display: flex; width: 100%; align-items: center; gap: 9px; padding: 8px 9px; border: 0; border-radius: 6px; background: transparent; text-align: left; cursor: pointer; }
+    .menu-option:hover { background: #f5f6f8; }
+    .menu-option.selected { color: var(--primary); background: var(--primary-soft); }
+    .menu-option i { margin-left: auto; }
+    .sort-grid { display: grid; grid-template-columns: repeat(4,38px); gap: 5px; }
+    .sort-icon { position: relative; display: grid; width: 38px; height: 38px; place-items: center; padding: 0; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--muted); cursor: pointer; }
+    .sort-icon:hover { border-color: var(--border); background: #f5f6f8; color: var(--text); }
+    .sort-icon.selected { border-color: #b8bdec; background: var(--primary-soft); color: var(--primary); }
+    [data-tip]::after { position: absolute; z-index: 40; display: none; width: max-content; max-width: 220px; padding: 5px 8px; border-radius: 5px; background: #252833; color: #fff; content: attr(data-tip); font-size: 11px; font-weight: 400; line-height: 1.4; pointer-events: none; }
+    [data-tip]:hover::after { display: block; }
+    .icon-btn[data-tip]::after { right: 0; top: 40px; }
+    .sort-icon[data-tip]::after { left: 50%; bottom: calc(100% + 7px); translate: -50% 0; }
+    .search-wrap { position: relative; margin-bottom: 8px; }
+    .search-wrap svg { position: absolute; left: 10px; top: 9px; color: var(--muted); }
+    .search { width: 100%; height: 36px; padding: 0 10px 0 34px; border: 1px solid var(--border); border-radius: 6px; outline: none; }
+    .search:focus { border-color: #9399e8; box-shadow: 0 0 0 3px var(--primary-soft); }
+    .filter-block { padding: 9px 3px; border-top: 1px solid var(--border); }
+    .filter-label { margin-bottom: 7px; color: var(--muted); font-size: 11px; font-weight: 650; }
+    .checks { display: flex; flex-wrap: wrap; gap: 6px; }
+    .check { display: flex; align-items: center; gap: 5px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }
+    .check:has(input:checked) { border-color: #aeb3ed; background: var(--primary-soft); color: #353da0; }
+    .check input { width: 13px; height: 13px; margin: 0; accent-color: var(--primary); }
+    .filter-actions { display: flex; justify-content: space-between; align-items: center; padding: 8px 3px 2px; }
+    .text-btn { padding: 5px 7px; border: 0; background: transparent; color: var(--muted); cursor: pointer; }
+    .text-btn:hover { color: var(--text); }
+    .directory-meta { display: flex; justify-content: space-between; padding: 8px 15px; border-bottom: 1px solid var(--border); color: var(--muted); font-size: 11px; }
+    .entries { min-height: 314px; padding: 6px; }
+    .entry { display: grid; grid-template-columns: 30px minmax(0,1fr) auto; align-items: center; gap: 8px; width: 100%; min-height: 52px; padding: 6px 9px; border: 1px solid transparent; border-radius: 7px; background: transparent; text-align: left; cursor: pointer; }
+    .entry:hover { background: rgba(255,255,255,.76); }
+    .entry.selected { border-color: #bec2ef; background: var(--primary-soft); }
+    .entry-icon { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 6px; background: #f0f1f4; color: #646b78; }
+    .entry.folder .entry-icon { background: #fff3d9; color: #9b681c; }
+    .entry-name { overflow: hidden; font-weight: 570; text-overflow: ellipsis; white-space: nowrap; }
+    .entry-detail { margin-top: 1px; color: var(--muted); font-size: 11px; }
+    .status { padding: 3px 6px; border-radius: 5px; font-size: 10px; white-space: nowrap; }
+    .status.ready { background: #e5f6ee; color: var(--green); }
+    .status.stale { background: #fff1df; color: var(--amber); }
+    .status.none { background: #f0f1f4; color: var(--muted); }
+    .empty { display: grid; min-height: 250px; place-items: center; color: var(--muted); text-align: center; }
+    .empty svg { margin: auto auto 8px; }
+    .selection { padding: 22px; }
+    .selection.empty-selection { display: grid; place-items: center; text-align: center; color: var(--muted); }
+    .selection-kicker { color: var(--muted); font-size: 11px; font-weight: 650; }
+    .selection h2 { margin: 6px 0 4px; font-size: 19px; }
+    .path { overflow-wrap: anywhere; color: var(--muted); font: 12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; }
+    .summary { margin: 18px 0; padding: 14px 0; border-block: 1px solid var(--border); color: #4d525e; }
+    .facts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .fact span { display: block; color: var(--muted); font-size: 11px; }
+    .fact strong { display: block; margin-top: 2px; font-weight: 600; }
+    .clear-selection { display: inline-flex; align-items: center; gap: 6px; margin-top: 20px; padding: 7px 9px; border: 1px solid var(--border); border-radius: 6px; background: var(--solid); cursor: pointer; }
+    .form-section { padding: 18px; }
+    .form-title { margin: 0 0 10px; font-weight: 650; }
+    textarea { width: 100%; min-height: 112px; resize: vertical; padding: 11px 12px; border: 1px solid var(--border); border-radius: 7px; background: rgba(255,255,255,.72); color: var(--text); outline: none; }
+    textarea:focus { border-color: #9399e8; box-shadow: 0 0 0 3px var(--primary-soft); }
+    .bottom { display: flex; justify-content: flex-end; }
+    .primary { display: inline-flex; align-items: center; gap: 8px; padding: 10px 15px; border: 0; border-radius: 7px; background: var(--primary); color: #fff; font-weight: 650; cursor: pointer; }
+    .mobile-brand { display: none; }
+    @media (max-width: 860px) {
+      .app { display: block; }
+      .sidebar { display: none; }
+      .mobile-brand { display: flex; align-items: center; gap: 9px; margin-bottom: 20px; font-weight: 700; }
+      .main { padding: 20px 14px 44px; }
+      .source-grid { grid-template-columns: 1fr; }
+      .browser { border-right: 0; border-bottom: 1px solid var(--border); }
+      .selection { min-height: 260px; }
+    }
+    @media (max-width: 480px) {
+      .section-head { align-items: flex-start; }
+      .section-sub { display: block; margin: 2px 0 0; }
+      .source-grid { display: block; }
+      .facts { grid-template-columns: 1fr; }
+      .popover { position: fixed; inset: auto 12px 12px; width: auto; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand"><span class="brand-mark"><i data-lucide="zap" size="18"></i></span><span>CodeSpar<small>轻松练 · 智能出题</small></span></div>
+      <nav class="nav">
+        <div class="nav-item"><i data-lucide="layout-dashboard" size="17"></i>仪表盘</div>
+        <div class="nav-item active"><i data-lucide="sparkles" size="17"></i>出题</div>
+        <div class="nav-item"><i data-lucide="book-open" size="17"></i>文章</div>
+        <div class="nav-item"><i data-lucide="file-text" size="17"></i>我的试卷</div>
+        <div class="nav-item"><i data-lucide="book-marked" size="17"></i>错题本</div>
+        <div class="nav-item"><i data-lucide="history" size="17"></i>出题历史</div>
+        <div class="nav-item"><i data-lucide="settings-2" size="17"></i>设置</div>
+      </nav>
+    </aside>
+
+    <main class="main">
+      <div class="content">
+        <div class="mobile-brand"><span class="brand-mark"><i data-lucide="zap" size="18"></i></span>CodeSpar</div>
+        <header class="page-head"><h1>出题</h1><p>选择资料范围，再描述这套试卷想考什么。</p></header>
+
+        <section class="section">
+          <div class="section-head">
+            <div><span class="section-title">文章目录</span><span class="section-sub">选择一篇文章作为本次出题资料</span></div>
+            <span id="pickedBadge" class="status none">未选择</span>
+          </div>
+          <div class="source-grid">
+            <div class="browser">
+              <div class="browser-tools">
+                <div id="breadcrumbs" class="breadcrumbs"></div>
+                <div class="tool-group">
+                  <button id="sortButton" class="icon-btn" data-tip="排序" aria-label="排序" aria-expanded="false"><i data-lucide="arrow-up-down" size="17"></i></button>
+                  <div id="sortMenu" class="popover" style="width:auto"></div>
+                  <button id="filterButton" class="icon-btn" data-tip="筛选当前目录" aria-label="筛选当前目录" aria-expanded="false"><i data-lucide="list-filter" size="17"></i><span id="filterCount" class="filter-count" hidden></span></button>
+                  <div id="filterMenu" class="popover">
+                    <div class="search-wrap"><i data-lucide="search" size="16"></i><input id="searchInput" class="search" placeholder="筛选当前目录" /></div>
+                    <div id="categoryFilters" class="filter-block"></div>
+                    <div id="statusFilters" class="filter-block"></div>
+                    <div class="filter-actions"><span id="filterScope" style="color:var(--muted);font-size:11px"></span><button id="resetFilter" class="text-btn">清除筛选</button></div>
+                  </div>
+                </div>
+              </div>
+              <div class="directory-meta"><span id="resultMeta"></span><span>目录优先</span></div>
+              <div id="entries" class="entries"></div>
+            </div>
+            <div id="selection" class="selection empty-selection"></div>
+          </div>
+        </section>
+
+        <section class="section form-section">
+          <div class="form-title">出题要求</div>
+          <textarea placeholder="想考什么？描述得越具体，题越贴合。">围绕核心概念、常见误区和工程实践出一套完整试卷。</textarea>
+        </section>
+        <div class="bottom"><button class="primary"><i data-lucide="sparkles" size="17"></i>生成试卷</button></div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const folders = [
+      { id:'java', parent:'root', name:'Java', created:'2026-08-12' },
+      { id:'ai', parent:'root', name:'AI 工程', created:'2026-08-28' },
+      { id:'architecture', parent:'root', name:'系统设计', created:'2026-07-19' },
+      { id:'concurrency', parent:'java', name:'并发编程', created:'2026-08-15' },
+      { id:'jvm', parent:'java', name:'JVM', created:'2026-08-13' },
+      { id:'rag', parent:'ai', name:'RAG', created:'2026-09-01' }
+    ];
+    const articles = [
+      { id:1, parent:'root', name:'工程师的系统思维.md', category:'工程实践', status:'READY', created:'2026-09-03', summary:'从问题拆解、约束识别到方案权衡，建立可复用的系统化分析框架。' },
+      { id:2, parent:'root', name:'分布式系统经典问题.md', category:'系统设计', status:'STALE', created:'2026-08-30', summary:'梳理一致性、可用性、分区容错与常见分布式协议。' },
+      { id:3, parent:'root', name:'面试复盘清单.md', category:'工程实践', status:'NONE', created:'2026-08-18', summary:'面试后用于记录知识缺口、表达问题与后续行动。' },
+      { id:10, parent:'root', name:'2-缓存设计.md', category:'系统设计', status:'READY', created:'2026-08-25', summary:'缓存一致性、穿透、击穿、雪崩以及多级缓存设计。' },
+      { id:11, parent:'root', name:'10-容量规划.md', category:'系统设计', status:'NONE', created:'2026-08-24', summary:'从业务指标推导容量需求，并规划扩容与压测方案。' },
+      { id:4, parent:'concurrency', name:'JMM 与 happens-before.md', category:'Java', status:'READY', created:'2026-09-02', summary:'Java 内存模型、可见性、有序性及 happens-before 规则。' },
+      { id:5, parent:'concurrency', name:'线程池参数与故障排查.md', category:'Java', status:'READY', created:'2026-08-21', summary:'线程池关键参数、拒绝策略和线上问题排查方法。' },
+      { id:6, parent:'jvm', name:'GC 算法与收集器.md', category:'Java', status:'STALE', created:'2026-08-20', summary:'垃圾回收算法、分代模型与主流收集器的选择。' },
+      { id:7, parent:'rag', name:'RAG 评测体系.md', category:'AI 应用', status:'READY', created:'2026-09-02', summary:'从检索、生成和端到端维度建立 RAG 评测体系。' },
+      { id:8, parent:'ai', name:'Agent 工具调用设计.md', category:'AI 应用', status:'NONE', created:'2026-08-29', summary:'工具协议、调用决策、错误恢复与可观测性设计。' },
+      { id:9, parent:'architecture', name:'高可用架构模式.md', category:'系统设计', status:'READY', created:'2026-08-26', summary:'冗余、隔离、限流、降级与故障转移的架构实践。' }
+    ];
+    const state = { folder:'root', sort:'created-desc', query:'', categories:new Set(), statuses:new Set(), selected:null };
+    const sortOptions = [
+      ['created-desc','创建时间：新到旧','calendar-arrow-down'],
+      ['created-asc','创建时间：旧到新','calendar-arrow-up'],
+      ['name-asc','文件名：数字从小到大，字母 A 到 Z','arrow-down-a-z'],
+      ['name-desc','文件名：数字从大到小，字母 Z 到 A','arrow-up-z-a']
+    ];
+    const statusText = { READY:'已提炼', STALE:'已过期', NONE:'未提炼' };
+    const $ = (id) => document.getElementById(id);
+
+    function currentArticles() { return articles.filter(a => a.parent === state.folder); }
+    function currentFolders() { return folders.filter(f => f.parent === state.folder); }
+    function folderName(id) { return id === 'root' ? '全部文章' : folders.find(f => f.id === id)?.name || id; }
+    function chain() {
+      const list = [{id:'root',name:'全部文章'}];
+      let id = state.folder, stack = [];
+      while (id !== 'root') { const f = folders.find(x => x.id === id); if (!f) break; stack.unshift(f); id = f.parent; }
+      return list.concat(stack);
+    }
+    function activeFilterCount() { return (state.query ? 1 : 0) + state.categories.size + state.statuses.size; }
+    function compare(a,b) {
+      const direction = state.sort.endsWith('desc') ? -1 : 1;
+      const key = state.sort.startsWith('name') ? 'name' : 'created';
+      return String(a[key]).localeCompare(String(b[key]), ['zh-CN','en'], { numeric:true, sensitivity:'base' }) * direction;
+    }
+    function filteredArticles() {
+      return currentArticles().filter(a => {
+        const q = state.query.trim().toLocaleLowerCase();
+        return (!q || a.name.toLocaleLowerCase().includes(q)) && (!state.categories.size || state.categories.has(a.category)) && (!state.statuses.size || state.statuses.has(a.status));
+      }).sort(compare);
+    }
+    function filteredFolders() {
+      const q = state.query.trim().toLocaleLowerCase();
+      return currentFolders().filter(f => !q || f.name.toLocaleLowerCase().includes(q)).sort(compare);
+    }
+    function renderBreadcrumbs() {
+      $('breadcrumbs').innerHTML = chain().map((c,i,arr) => `<button class="crumb ${i===arr.length-1?'current':''}" data-folder="${c.id}">${c.name}</button>${i<arr.length-1?'<span class="crumb-sep">/</span>':''}`).join('');
+    }
+    function renderSort() {
+      const active = sortOptions.find(x => x[0]===state.sort);
+      $('sortButton').innerHTML = `<i data-lucide="${active[2]}" size="17"></i>`;
+      $('sortButton').dataset.tip = active[1];
+      $('sortButton').setAttribute('aria-label', active[1]);
+      $('sortMenu').innerHTML = `<div class="sort-grid">${sortOptions.map(([value,label,icon]) => `<button class="sort-icon ${state.sort===value?'selected':''}" data-sort="${value}" data-tip="${label}" aria-label="${label}" aria-pressed="${state.sort===value}"><i data-lucide="${icon}" size="17"></i></button>`).join('')}</div>`;
+    }
+    function renderFilters() {
+      const local = currentArticles();
+      const categories = [...new Set(local.map(a=>a.category))].sort((a,b)=>a.localeCompare(b,'zh-CN'));
+      const statuses = [...new Set(local.map(a=>a.status))];
+      state.categories.forEach(v => { if(!categories.includes(v)) state.categories.delete(v); });
+      state.statuses.forEach(v => { if(!statuses.includes(v)) state.statuses.delete(v); });
+      $('categoryFilters').innerHTML = `<div class="filter-label">当前目录的分类</div><div class="checks">${categories.length?categories.map(v=>`<label class="check"><input type="checkbox" data-category="${v}" ${state.categories.has(v)?'checked':''}>${v}</label>`).join(''):'<span style="color:var(--muted);font-size:12px">没有可筛选的文章</span>'}</div>`;
+      $('statusFilters').innerHTML = `<div class="filter-label">提炼状态</div><div class="checks">${statuses.map(v=>`<label class="check"><input type="checkbox" data-status="${v}" ${state.statuses.has(v)?'checked':''}>${statusText[v]}</label>`).join('')}</div>`;
+      $('filterScope').textContent = folderName(state.folder);
+      $('searchInput').value = state.query;
+      const count = activeFilterCount();
+      $('filterCount').hidden = count === 0;
+      $('filterCount').textContent = count;
+      $('filterButton').classList.toggle('on', count > 0);
+    }
+    function renderEntries() {
+      const fs = filteredFolders(), as = filteredArticles();
+      $('resultMeta').textContent = `${fs.length} 个文件夹 · ${as.length} 篇文章`;
+      if (!fs.length && !as.length) {
+        $('entries').innerHTML = `<div class="empty"><div><i data-lucide="search-x" size="28"></i><div>当前目录没有匹配内容</div><button class="text-btn" data-reset>清除筛选</button></div></div>`;
+        return;
+      }
+      $('entries').innerHTML = fs.map(f=>`<button class="entry folder" data-folder="${f.id}"><span class="entry-icon"><i data-lucide="folder" size="16"></i></span><span><span class="entry-name">${f.name}</span><div class="entry-detail">创建于 ${f.created}</div></span><i data-lucide="chevron-right" size="16"></i></button>`).join('') + as.map(a=>`<button class="entry ${state.selected===a.id?'selected':''}" data-article="${a.id}"><span class="entry-icon"><i data-lucide="file-text" size="16"></i></span><span><span class="entry-name">${a.name}</span><div class="entry-detail">${a.category} · ${a.created}</div></span><span class="status ${a.status.toLowerCase()}">${statusText[a.status]}</span></button>`).join('');
+    }
+    function renderSelection() {
+      const a = articles.find(x => x.id === state.selected);
+      if (!a) {
+        $('selection').className = 'selection empty-selection';
+        $('selection').innerHTML = `<div><i data-lucide="mouse-pointer-2" size="30"></i><p>从左侧选择一篇文章<br><span style="font-size:12px">出题时仅使用该文章的考点摘要</span></p></div>`;
+        $('pickedBadge').className = 'status none'; $('pickedBadge').textContent = '未选择'; return;
+      }
+      $('selection').className = 'selection';
+      const path = chainForArticle(a).map(x=>x.name).concat(a.name).join(' / ');
+      $('selection').innerHTML = `<div class="selection-kicker">本次出题资料</div><h2>${a.name.replace(/\.md$/,'')}</h2><div class="path">${path}</div><div class="summary">${a.summary}</div><div class="facts"><div class="fact"><span>主分类</span><strong>${a.category}</strong></div><div class="fact"><span>摘要状态</span><strong>${statusText[a.status]}</strong></div><div class="fact"><span>创建时间</span><strong>${a.created}</strong></div><div class="fact"><span>注入方式</span><strong>考点摘要</strong></div></div><button class="clear-selection" data-clear><i data-lucide="x" size="15"></i>取消选择</button>`;
+      $('pickedBadge').className = `status ${a.status.toLowerCase()}`; $('pickedBadge').textContent = '已选择';
+    }
+    function chainForArticle(a) {
+      const out=[]; let id=a.parent;
+      while(id!=='root'){ const f=folders.find(x=>x.id===id); if(!f)break; out.unshift(f); id=f.parent; }
+      return [{id:'root',name:'全部文章'}].concat(out);
+    }
+    function refresh() { renderBreadcrumbs(); renderSort(); renderFilters(); renderEntries(); renderSelection(); if(window.lucide) lucide.createIcons(); }
+    function enterFolder(id) { state.folder=id; state.query=''; state.categories.clear(); state.statuses.clear(); closePopovers(); refresh(); }
+    function closePopovers() { ['sortMenu','filterMenu'].forEach(id=>$(id).classList.remove('open')); $('sortButton').setAttribute('aria-expanded','false'); $('filterButton').setAttribute('aria-expanded','false'); }
+    function togglePopover(id,button) { const willOpen=!$(id).classList.contains('open'); closePopovers(); if(willOpen){$(id).classList.add('open');$(button).setAttribute('aria-expanded','true');} }
+
+    document.addEventListener('click', e => {
+      const folder=e.target.closest('[data-folder]'); if(folder){enterFolder(folder.dataset.folder);return;}
+      const article=e.target.closest('[data-article]'); if(article){state.selected=Number(article.dataset.article);refresh();return;}
+      const sort=e.target.closest('[data-sort]'); if(sort){state.sort=sort.dataset.sort;closePopovers();refresh();return;}
+      if(e.target.closest('[data-clear]')){state.selected=null;refresh();return;}
+      if(e.target.closest('[data-reset]')){resetFilters();return;}
+      if(!e.target.closest('.tool-group')) closePopovers();
+    });
+    $('sortButton').addEventListener('click',()=>togglePopover('sortMenu','sortButton'));
+    $('filterButton').addEventListener('click',()=>{togglePopover('filterMenu','filterButton');setTimeout(()=>$('searchInput').focus(),0);});
+    $('searchInput').addEventListener('input',e=>{state.query=e.target.value;renderEntries();renderFilters();if(window.lucide)lucide.createIcons();});
+    $('filterMenu').addEventListener('change',e=>{if(e.target.dataset.category){e.target.checked?state.categories.add(e.target.dataset.category):state.categories.delete(e.target.dataset.category);}if(e.target.dataset.status){e.target.checked?state.statuses.add(e.target.dataset.status):state.statuses.delete(e.target.dataset.status);}renderEntries();renderFilters();if(window.lucide)lucide.createIcons();});
+    $('resetFilter').addEventListener('click',resetFilters);
+    function resetFilters(){state.query='';state.categories.clear();state.statuses.clear();refresh();$('filterMenu').classList.add('open');}
+    refresh();
+  </script>
+</body>
+</html>

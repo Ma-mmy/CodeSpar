@@ -14,8 +14,9 @@ frontend/.vite/
 
 # IDE
 .idea/
-.vscode/
+.vscode/g
 *.iml
 
 # macOS
 .DS_Store
+.codespar

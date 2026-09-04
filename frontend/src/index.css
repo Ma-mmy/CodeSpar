@@ -502,6 +502,13 @@
       -webkit-backdrop-filter: var(--glass-filter-mobile);
       backdrop-filter: var(--glass-filter-mobile);
     }
+
+    /* 阅读正文滚动时避免大面积实时模糊导致移动端 GPU 持续重绘。 */
+    .article-workspace .article-reader {
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+      background: var(--card);
+    }
   }
 
   /* 尊重"减少动态效果"系统设置 */

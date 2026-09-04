@@ -45,6 +45,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -57,6 +58,7 @@ public class ArticleService {
 
     public static final int MAX_BODY_BYTES = 1024 * 1024;
     public static final int MAX_REFINE_BYTES = 200 * 1024;
+    private static final int REFINE_CHUNK_CHARS = 28_000;
     private static final int MAX_FOLDER_DEPTH = 5;
 
     private final ArticleFolderMapper folderMapper;
@@ -301,7 +303,7 @@ public class ArticleService {
         if (folderId != null) {
             getFolderRequired(folderId);
         }
-        String title = deriveTitle(original, body);
+        String title = deriveTitleFromFilename(original);
         UpsertArticleRequest req = new UpsertArticleRequest();
         req.setFolderId(folderId);
         req.setTitle(title);
@@ -473,8 +475,22 @@ public class ArticleService {
             try { body = notesPath.read(file, NotesPath.MAX_ARTICLE_BYTES); } catch (Exception e) { result.setSkipped(result.getSkipped()+1); continue; }
             Article a = articleMapper.selectOne(Wrappers.<Article>lambdaQuery().eq(Article::getSourcePath, source));
             String hash = sha256(body);
-            if (a == null) { a = new Article(); a.setSourcePath(source); a.setFolderId(folderIdFor(Path.of(source).getParent(), folders)); a.setTitle(deriveTitle(file.getFileName().toString(), body)); a.setBodyMd(body); a.setBodyHash(hash); a.setSummaryStatus("NONE"); articleMapper.insert(a); result.setAdded(result.getAdded()+1); }
-            else if (!Objects.equals(hash, a.getBodyHash())) { a.setTitle(deriveTitle(file.getFileName().toString(), body)); a.setBodyMd(body); a.setBodyHash(hash); if ("READY".equals(a.getSummaryStatus()) || "STALE".equals(a.getSummaryStatus())) a.setSummaryStatus("STALE"); articleMapper.updateById(a); result.setUpdated(result.getUpdated()+1); }
+            String diskTitle = deriveTitleFromFilename(file.getFileName().toString());
+            if (a == null) { a = new Article(); a.setSourcePath(source); a.setFolderId(folderIdFor(Path.of(source).getParent(), folders)); a.setTitle(diskTitle); a.setBodyMd(body); a.setBodyHash(hash); a.setSummaryStatus("NONE"); articleMapper.insert(a); result.setAdded(result.getAdded()+1); }
+            else {
+                boolean bodyChanged = !Objects.equals(hash, a.getBodyHash());
+                boolean titleChanged = !isManagedArticleFile(a) && !Objects.equals(diskTitle, a.getTitle());
+                if (bodyChanged || titleChanged) {
+                    if (titleChanged) a.setTitle(diskTitle);
+                    if (bodyChanged) {
+                        a.setBodyMd(body);
+                        a.setBodyHash(hash);
+                        if ("READY".equals(a.getSummaryStatus()) || "STALE".equals(a.getSummaryStatus())) a.setSummaryStatus("STALE");
+                    }
+                    articleMapper.updateById(a);
+                    result.setUpdated(result.getUpdated()+1);
+                }
+            }
         }
         for (Article a : articleMapper.selectList(Wrappers.<Article>lambdaQuery().isNotNull(Article::getSourcePath))) {
             if (!seen.contains(a.getSourcePath())) {
@@ -544,16 +560,17 @@ public class ArticleService {
             }
             ModelProfile profile = modelService.getRequired(modelProfileId);
             ChatModel chatModel = modelFactory.get(profile);
-            String prompt = promptBuilder.buildArticleRefine(
-                    a.getTitle(),
-                    a.getCategory(),
-                    readBody(a));
-            ChatResponse resp = chatModel.call(new Prompt(prompt));
-            String raw = extractText(resp);
-            if (raw == null || raw.isBlank()) {
-                throw new IllegalStateException("模型返回空的摘要结果");
+            String body = normalizeArticleBody(readBody(a));
+            List<String> chunks = splitArticleBody(body);
+            List<JsonNode> parts = new ArrayList<>();
+            for (String chunk : chunks) {
+                String prompt = promptBuilder.buildArticleRefine(a.getTitle(), a.getCategory(), chunk);
+                parts.add(callRefine(chatModel, prompt));
             }
-            JsonNode node = jsonParser.parse(raw, JsonNode.class);
+            if (parts.isEmpty()) {
+                parts.add(callRefine(chatModel, promptBuilder.buildArticleRefine(a.getTitle(), a.getCategory(), "")));
+            }
+            JsonNode node = parts.size() == 1 ? parts.get(0) : mergeRefineParts(chatModel, a, parts);
             String summaryMd = textOrEmpty(node, "summaryMarkdown");
             if (summaryMd.isBlank()) {
                 // 兜底：用结构化字段拼一份可读摘要
@@ -578,6 +595,62 @@ public class ArticleService {
             failed.setSummaryError(truncate(Objects.toString(e.getMessage(), e.toString()), 500));
             articleMapper.updateById(failed);
         }
+    }
+
+    private JsonNode callRefine(ChatModel chatModel, String prompt) {
+        String raw = extractText(chatModel.call(new Prompt(prompt)));
+        if (raw.isBlank()) throw new IllegalStateException("模型返回空的摘要结果");
+        return jsonParser.parse(raw, JsonNode.class);
+    }
+
+    private JsonNode mergeRefineParts(ChatModel chatModel, Article article, List<JsonNode> parts) {
+        StringBuilder material = new StringBuilder();
+        int perPartBudget = Math.max(1, PromptBuilder.MAX_ARTICLE_REFINE_CHARS / parts.size() - 32);
+        for (JsonNode part : parts) {
+            String md = textOrEmpty(part, "summaryMarkdown");
+            if (md.isBlank()) md = fallbackMarkdown(part, article.getTitle());
+            material.append(truncate(md, perPartBudget)).append("\n\n");
+        }
+        return callRefine(chatModel, promptBuilder.buildArticleRefine(article.getTitle(), article.getCategory(), material.toString()));
+    }
+
+    static List<String> splitArticleBody(String body) {
+        if (body == null || body.isEmpty()) return List.of();
+        List<String> chunks = new ArrayList<>();
+        int start = 0;
+        while (start < body.length()) {
+            int end = Math.min(body.length(), start + REFINE_CHUNK_CHARS);
+            if (end < body.length()) {
+                int newline = body.lastIndexOf('\n', end);
+                if (newline > start + REFINE_CHUNK_CHARS / 2) end = newline + 1;
+            }
+            chunks.add(body.substring(start, end));
+            start = end;
+        }
+        return chunks;
+    }
+
+    /** Remove formatting noise while preserving fenced code blocks byte-for-byte. */
+    static String normalizeArticleBody(String body) {
+        if (body == null || body.isEmpty()) return "";
+        StringBuilder out = new StringBuilder(body.length());
+        boolean inFence = false;
+        int blankLines = 0;
+        for (String line : body.replace("\r\n", "\n").replace('\r', '\n').split("\n", -1)) {
+            boolean wasInFence = inFence;
+            String probe = line.stripLeading();
+            String trimmed = wasInFence ? line : line.stripTrailing();
+            if (probe.startsWith("```") || probe.startsWith("~~~")) inFence = !inFence;
+            if (!wasInFence) trimmed = trimmed.replaceAll("[ \\t]{2,}", " ");
+            if (!inFence && trimmed.isBlank()) {
+                if (++blankLines > 1) continue;
+            } else {
+                blankLines = 0;
+            }
+            if (out.length() > 0) out.append('\n');
+            out.append(trimmed);
+        }
+        return out.toString().trim();
     }
 
     /* ========================================================== 校验 / 工具 */
@@ -676,25 +749,22 @@ public class ArticleService {
         return false;
     }
 
-    private static String deriveTitle(String filename, String body) {
-        for (String line : body.split("\n")) {
-            String t = line.trim();
-            if (t.startsWith("# ")) {
-                String h = t.substring(2).trim();
-                if (!h.isEmpty()) {
-                    return h.length() > 200 ? h.substring(0, 200) : h;
-                }
-            }
-        }
+    static String deriveTitleFromFilename(String filename) {
         String name = filename;
         int slash = Math.max(name.lastIndexOf('/'), name.lastIndexOf('\\'));
         if (slash >= 0) {
             name = name.substring(slash + 1);
         }
-        if (name.toLowerCase().endsWith(".md")) {
+        if (name.toLowerCase(Locale.ROOT).endsWith(".md")) {
             name = name.substring(0, name.length() - 3);
         }
         return name.isBlank() ? "未命名文章" : (name.length() > 200 ? name.substring(0, 200) : name);
+    }
+
+    private static boolean isManagedArticleFile(Article article) {
+        if (article.getId() == null || article.getSourcePath() == null) return false;
+        String filename = Path.of(article.getSourcePath()).getFileName().toString().toLowerCase(Locale.ROOT);
+        return filename.endsWith("-" + article.getId() + ".md");
     }
 
     private static String sha256(String text) {

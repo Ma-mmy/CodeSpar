@@ -15,6 +15,8 @@ import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.PosixFilePermission;
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Base64;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -97,6 +99,21 @@ public class AccessPasswordStore {
 
     public int generation() {
         return generation.get();
+    }
+
+    /** 用于让持久解锁凭证绑定当前口令；只返回不可逆摘要，不暴露口令或 BCrypt 哈希。 */
+    public String credentialFingerprint() {
+        String current = managedByConfig ? configPassword : hash;
+        if (current == null) {
+            return "";
+        }
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest(current.getBytes(StandardCharsets.UTF_8));
+            return Base64.getUrlEncoder().withoutPadding().encodeToString(digest);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("JVM 不支持 SHA-256", e);
+        }
     }
 
     public boolean matches(String plaintext) {

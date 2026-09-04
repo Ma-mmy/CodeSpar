@@ -4,16 +4,6 @@ server:
   # 默认只听本机。公网请用 Caddy/nginx 反代，不要直接把 0.0.0.0 暴露出去。
   address: ${CODESPAR_BIND:127.0.0.1}
   forward-headers-strategy: framework
-  servlet:
-    session:
-      timeout: 7d
-      cookie:
-        name: CODESPAR_SID
-        http-only: true
-        same-site: lax
-        path: /
-        max-age: 7d
-
 spring:
   application:
     name: codespar
@@ -95,6 +85,8 @@ codespar:
     # 此项不要修改，就保持明文即可
     password: ma123456
     hash-file: ${CODESPAR_ACCESS_HASH_FILE:${user.home}/.codespar/access.hash}
+    # 解锁状态写入加密 Cookie，可跨后端重启保持；到期后需重新输入口令。
+    session-duration: 7d
     login-max-failures: 5
     login-window-sec: 600
   generation:

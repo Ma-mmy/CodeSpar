@@ -28,12 +28,15 @@ public class AccessControlFilter extends OncePerRequestFilter {
             HttpMethod.PATCH.name(), HttpMethod.DELETE.name());
 
     private final AccessPasswordStore store;
+    private final AccessSessions sessions;
     private final String publicOrigin;
 
     public AccessControlFilter(
             AccessPasswordStore store,
+            AccessSessions sessions,
             @Value("${codespar.public-origin:}") String publicOrigin) {
         this.store = store;
+        this.sessions = sessions;
         this.publicOrigin = publicOrigin == null ? "" : publicOrigin.trim();
     }
 
@@ -71,7 +74,7 @@ public class AccessControlFilter extends OncePerRequestFilter {
             return;
         }
 
-        if (!AccessSessions.isUnlocked(request, store)) {
+        if (!sessions.isUnlocked(request)) {
             writeJson(response, HttpServletResponse.SC_UNAUTHORIZED, "未解锁");
             return;
         }

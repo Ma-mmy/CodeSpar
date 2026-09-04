@@ -27,6 +27,9 @@ import java.util.concurrent.ConcurrentHashMap;
 @RequiredArgsConstructor
 public class PromptBuilder {
 
+    /** Keep article prompts below common provider/gateway context and execution limits. */
+    public static final int MAX_ARTICLE_REFINE_CHARS = 32_000;
+
     private final SystemPromptService systemPromptService;
     private final CategoryService categoryService;
 
@@ -171,9 +174,9 @@ public class PromptBuilder {
                         ? "（未指定）"
                         : categoryService.labelOf(categoryCode.trim()));
         String body = bodyMd == null ? "" : bodyMd;
-        // 防御性截断，避免极端长文撑爆上下文（库内已有 200KB 硬限）
-        if (body.length() > 120_000) {
-            body = body.substring(0, 120_000) + "\n\n…（原文过长，已截断）";
+        // 防御性截断，避免长文让上游模型/网关超时（库内仍保留 200KB 存储上限）
+        if (body.length() > MAX_ARTICLE_REFINE_CHARS) {
+            body = body.substring(0, MAX_ARTICLE_REFINE_CHARS) + "\n\n…（原文过长，已截断）";
         }
         vars.put("body_md", body);
         return render("article_refine", vars);

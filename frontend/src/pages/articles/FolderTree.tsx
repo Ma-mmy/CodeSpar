@@ -1,4 +1,3 @@
-import { useState, type DragEvent } from 'react'
 import {
   BookOpen,
   ChevronDown,
@@ -10,20 +9,6 @@ import {
 import { SUMMARY_STATUS_LABEL, type ArticleListItem, type FolderView, type SummaryStatus } from '@/api/articles'
 import { cn } from '@/lib/utils'
 
-export type DragPayload = { kind: 'article'; id: number } | { kind: 'folder'; id: number }
-
-const DND_MIME = 'application/x-codespar-dnd'
-
-function readDragPayload(e: DragEvent): DragPayload | null {
-  try {
-    const raw = e.dataTransfer.getData(DND_MIME)
-    if (!raw) return null
-    return JSON.parse(raw) as DragPayload
-  } catch {
-    return null
-  }
-}
-
 export function FolderTree({
   node,
   depth,
@@ -34,7 +19,6 @@ export function FolderTree({
   onNewFolder,
   onRenameFolder,
   onDeleteFolder,
-  onDropOnFolder,
 }: {
   node: FolderView
   depth: number
@@ -45,13 +29,10 @@ export function FolderTree({
   onNewFolder: (parentId: number | null) => void
   onRenameFolder: (id: number, name: string) => void
   onDeleteFolder: (id: number) => void
-  onDropOnFolder: (folderId: number | null, payload: DragPayload) => void
 }) {
   const isVirtualRoot = node.id == null
   const open = isVirtualRoot || !collapsed.has(node.id!)
   const hasKids = (node.children?.length ?? 0) > 0 || (node.articles?.length ?? 0) > 0
-  const [dragOver, setDragOver] = useState(false)
-
   const childrenList = (
     <>
       {(node.children ?? []).map((c) => (
@@ -66,7 +47,6 @@ export function FolderTree({
           onNewFolder={onNewFolder}
           onRenameFolder={onRenameFolder}
           onDeleteFolder={onDeleteFolder}
-          onDropOnFolder={onDropOnFolder}
         />
       ))}
       {(node.articles ?? []).map((a) => (
@@ -83,21 +63,7 @@ export function FolderTree({
 
   if (isVirtualRoot) {
     return (
-      <div
-        className={cn('min-h-[6rem] rounded-lg', dragOver && 'bg-primary/15 ring-1 ring-primary/40')}
-        onDragOver={(e) => {
-          e.preventDefault()
-          e.dataTransfer.dropEffect = 'move'
-          setDragOver(true)
-        }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={(e) => {
-          e.preventDefault()
-          setDragOver(false)
-          const payload = readDragPayload(e)
-          if (payload) onDropOnFolder(null, payload)
-        }}
-      >
+      <div className="min-h-[6rem] rounded-lg">
         {hasKids ? (
           childrenList
         ) : (
@@ -110,29 +76,8 @@ export function FolderTree({
   return (
     <div>
       <div
-        className={cn(
-          'group flex items-center gap-1 rounded-lg px-1.5 py-1 text-sm transition',
-          dragOver ? 'bg-primary/15 ring-1 ring-primary/40' : 'hover:bg-black/5 dark:hover:bg-white/5',
-        )}
+        className="group flex items-center gap-1 rounded-lg px-1.5 py-1 text-sm transition hover:bg-black/5 dark:hover:bg-white/5"
         style={{ paddingLeft: 4 + depth * 12 }}
-        draggable
-        onDragStart={(e) => {
-          const payload: DragPayload = { kind: 'folder', id: node.id! }
-          e.dataTransfer.setData(DND_MIME, JSON.stringify(payload))
-          e.dataTransfer.effectAllowed = 'move'
-        }}
-        onDragOver={(e) => {
-          e.preventDefault()
-          e.dataTransfer.dropEffect = 'move'
-          setDragOver(true)
-        }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={(e) => {
-          e.preventDefault()
-          setDragOver(false)
-          const payload = readDragPayload(e)
-          if (payload) onDropOnFolder(node.id ?? null, payload)
-        }}
       >
         <button type="button" className="rounded p-0.5 text-muted-foreground" onClick={() => onToggle(node.id!)}>
           {hasKids ? (
@@ -186,12 +131,8 @@ function ArticleRow({
   return (
     <button
       type="button"
-      draggable
-      onDragStart={(e) => {
-        const payload: DragPayload = { kind: 'article', id: article.id }
-        e.dataTransfer.setData(DND_MIME, JSON.stringify(payload))
-        e.dataTransfer.effectAllowed = 'move'
-      }}
+      data-article-row
+      data-article-selected={selected ? 'true' : 'false'}
       onClick={onSelect}
       className={cn(
         'flex w-full items-center gap-2 rounded-lg px-1.5 py-1.5 text-left text-sm transition',

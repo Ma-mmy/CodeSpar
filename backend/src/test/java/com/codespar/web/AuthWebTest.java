@@ -2,12 +2,14 @@ package com.codespar.web;
 
 import com.codespar.config.AccessControlFilter;
 import com.codespar.config.AccessPasswordStore;
+import com.codespar.config.AccessSessions;
+import com.codespar.config.CryptoService;
 import com.codespar.config.LoginRateLimiter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.mock.web.MockHttpSession;
+import org.springframework.mock.web.MockCookie;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -17,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
+import java.time.Duration;
 
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
@@ -32,6 +35,7 @@ class AuthWebTest {
     MockMvc mvc;
     AccessPasswordStore store;
     LoginRateLimiter rateLimiter;
+    AccessSessions sessions;
 
     @BeforeEach
     void setup() {
@@ -43,6 +47,15 @@ class AuthWebTest {
         when(store.matches("test-pass-1")).thenReturn(true);
 
         rateLimiter = new LoginRateLimiter(5, 600);
+        CryptoService cryptoService = mock(CryptoService.class);
+        when(cryptoService.encrypt(anyString())).thenAnswer(invocation ->
+                java.util.Base64.getEncoder().encodeToString(
+                        invocation.<String>getArgument(0).getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        when(cryptoService.decrypt(anyString())).thenAnswer(invocation ->
+                new String(java.util.Base64.getDecoder().decode(invocation.<String>getArgument(0)),
+                        java.nio.charset.StandardCharsets.UTF_8));
+        when(store.credentialFingerprint()).thenReturn("credential-fingerprint");
+        sessions = new AccessSessions(store, cryptoService, Duration.ofDays(7), "");
 
         JdbcTemplate jdbc = mock(JdbcTemplate.class);
         when(jdbc.queryForObject("SELECT 1", Integer.class)).thenReturn(1);
@@ -50,11 +63,11 @@ class AuthWebTest {
         ReflectionTestUtils.setField(health, "appName", "codespar");
 
         mvc = MockMvcBuilders.standaloneSetup(
-                        new AuthController(store, rateLimiter),
+                        new AuthController(store, rateLimiter, sessions),
                         health,
                         new StubModelsController())
                 .setControllerAdvice(new ApiExceptionHandler())
-                .addFilters(new AccessControlFilter(store, ""))
+                .addFilters(new AccessControlFilter(store, sessions, ""))
                 .build();
     }
 
@@ -86,8 +99,8 @@ class AuthWebTest {
                 .andExpect(status().isNoContent())
                 .andReturn();
 
-        MockHttpSession session = (MockHttpSession) login.getRequest().getSession();
-        mvc.perform(get("/api/models").session(session))
+        String token = login.getResponse().getCookie("CODESPAR_SID").getValue();
+        mvc.perform(get("/api/models").cookie(new MockCookie("CODESPAR_SID", token)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.ok").value("true"));
     }

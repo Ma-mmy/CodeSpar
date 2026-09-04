@@ -65,6 +65,9 @@ import java.util.stream.Collectors;
 @Service
 public class GenerationService {
 
+    /** Article summaries are context, not the exam itself; keep repeated batch prompts bounded. */
+    private static final int MAX_ARTICLE_SUMMARY_CHARS = 12_000;
+
     private static final Set<String> TERMINAL = Set.of("SUCCESS", "PARTIAL", "FAILED", "CANCELLED");
 
     private final GenerationJobMapper jobMapper;
@@ -738,8 +741,8 @@ public class GenerationService {
             return userPrompt;
         }
         String summary = article.getSummaryMd().trim();
-        if (summary.length() > 40_000) {
-            summary = summary.substring(0, 40_000) + "\n\n…（摘要过长，已截断）";
+        if (summary.length() > MAX_ARTICLE_SUMMARY_CHARS) {
+            summary = summary.substring(0, MAX_ARTICLE_SUMMARY_CHARS) + "\n\n…（摘要过长，已截断）";
         }
         return userPrompt + "\n\n===== 文章《" + article.getTitle() + "》考点摘要 =====\n" + summary;
     }

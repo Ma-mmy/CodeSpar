@@ -53,6 +53,7 @@ export function ArticleWorkspace({
   const [lineHeight, setLineHeight] = useState(() =>
     readNumberPref('lineHeight', LH_DEFAULT, LH_MIN, LH_MAX),
   )
+  const [topBarHidden, setTopBarHidden] = useState(false)
 
   useEffect(() => {
     const mq = window.matchMedia('(min-width: 768px)')
@@ -109,6 +110,54 @@ export function ArticleWorkspace({
     return () => document.removeEventListener('keydown', onKey)
   }, [toggleZen, zen])
 
+  useEffect(() => {
+    if (!scrollRoot || isMd) return
+    let anchor = scrollRoot.scrollTop
+    let hiddenState = false
+    let ticking = false
+    let lastToggleAt = 0
+    const onScroll = () => {
+      if (ticking) return
+      ticking = true
+      requestAnimationFrame(() => {
+        ticking = false
+        const current = scrollRoot.scrollTop
+        if (current <= 16 && hiddenState) {
+          hiddenState = false
+          lastToggleAt = performance.now()
+          setTopBarHidden(false)
+          window.dispatchEvent(new CustomEvent('codespar:article-header', { detail: { hidden: false } }))
+          anchor = current
+          return
+        }
+        const delta = current - anchor
+        if (Math.abs(delta) >= 36 && performance.now() - lastToggleAt >= 280) {
+          const hidden = delta > 0
+          if (hidden !== hiddenState) {
+            hiddenState = hidden
+            lastToggleAt = performance.now()
+            setTopBarHidden(hidden)
+            window.dispatchEvent(new CustomEvent('codespar:article-header', { detail: { hidden } }))
+          }
+          anchor = current
+        }
+      })
+    }
+    scrollRoot.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      scrollRoot.removeEventListener('scroll', onScroll)
+      window.dispatchEvent(new CustomEvent('codespar:article-header', { detail: { hidden: false } }))
+    }
+  }, [scrollRoot, isMd])
+
+  useEffect(() => {
+    if (treeCollapsed || isMd) return
+    const timer = window.setTimeout(() => {
+      document.querySelector('[data-article-selected="true"]')?.scrollIntoView({ block: 'center' })
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [treeCollapsed, isMd])
+
   const tocVisible = !zen && showToc && !tocCollapsed
   const showTreeHandle = !zen && isMd && treeCollapsed
   const showTocHandle = !zen && isMd && showToc && tocCollapsed
@@ -133,7 +182,12 @@ export function ArticleWorkspace({
           </button>
         )}
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto">{tree}</div>
+      <div
+        className="min-h-0 flex-1 overflow-y-auto"
+        onClick={(event) => {
+          if (!isMd && (event.target as HTMLElement).closest('[data-article-row]')) setTreeOpen(false)
+        }}
+      >{tree}</div>
     </aside>
   )
 
@@ -161,7 +215,10 @@ export function ArticleWorkspace({
         'article-workspace relative',
         zen
           ? 'fixed inset-0 z-40 flex overflow-hidden bg-background p-6'
-          : 'flex h-[calc(100svh-5.5rem)] overflow-hidden p-3 md:h-svh',
+          : cn(
+              'flex overflow-hidden p-3 transition-[height] duration-300 ease-out md:h-svh',
+              topBarHidden ? 'h-svh' : 'h-[calc(100svh-5.5rem)]',
+            ),
       )}
       style={
         {
@@ -208,13 +265,16 @@ export function ArticleWorkspace({
 
       <div
         className={cn(
-          'relative flex min-w-0 flex-1 flex-col gap-3',
+          'relative flex min-w-0 flex-1 flex-col',
+          topBarHidden ? 'gap-0' : 'gap-3',
           zen && 'mx-auto h-full max-w-[860px]',
         )}
       >
-        <section className={cn('glass shrink-0 rounded-2xl px-5 py-3.5', zen && 'bg-transparent shadow-none')}>
-          {topBar}
-        </section>
+        <div className={cn('shrink-0 overflow-hidden transition-[max-height,opacity] duration-300 ease-out', topBarHidden ? 'max-h-0 opacity-0' : 'max-h-40 opacity-100')}>
+          <section className={cn('glass rounded-2xl px-5 py-3.5 transition-transform duration-300 ease-out', topBarHidden && '-translate-y-3', zen && 'bg-transparent shadow-none')}>
+            {topBar}
+          </section>
+        </div>
         <section
           ref={setScrollRoot}
           className={cn(
@@ -222,7 +282,18 @@ export function ArticleWorkspace({
             zen ? 'bg-transparent' : 'glass',
           )}
         >
-          {body}
+          <div
+            className="contents"
+            onClick={(event) => {
+              if (!isMd && (event.target as HTMLElement).closest('[data-open-directory]')) setTreeOpen(true)
+            }}
+            onKeyDown={(event) => {
+              if (!isMd && (event.key === 'Enter' || event.key === ' ') && (event.target as HTMLElement).closest('[data-open-directory]')) {
+                event.preventDefault()
+                setTreeOpen(true)
+              }
+            }}
+          >{body}</div>
         </section>
       </div>
 

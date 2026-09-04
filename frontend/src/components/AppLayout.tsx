@@ -153,11 +153,20 @@ function Brand() {
 
 export function AppLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [articleHeaderHidden, setArticleHeaderHidden] = useState(false)
   const { pathname } = useLocation()
   const headerHidden = useHideOnScroll({ resetKey: pathname, enabled: !drawerOpen })
 
   // 路由变化自动关抽屉
   useEffect(() => setDrawerOpen(false), [pathname])
+
+  useEffect(() => {
+    const onArticleScroll = (event: Event) => {
+      setArticleHeaderHidden(Boolean((event as CustomEvent<{ hidden?: boolean }>).detail?.hidden))
+    }
+    window.addEventListener('codespar:article-header', onArticleScroll)
+    return () => window.removeEventListener('codespar:article-header', onArticleScroll)
+  }, [])
 
   // 抽屉打开时锁定背景滚动
   useEffect(() => {
@@ -187,11 +196,11 @@ export function AppLayout() {
       <header
         className={cn(
           'glass-strong sticky top-3 z-30 mx-3 mt-3 flex items-center justify-between gap-3 rounded-2xl px-4 py-3 md:hidden',
-          'translate-y-0 transition-[translate] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]',
-          headerHidden && 'pointer-events-none -translate-y-[calc(100%+0.75rem)]',
+          'translate-y-0 max-h-24 transition-[translate,max-height,margin,padding,opacity] duration-300 ease-out',
+          (headerHidden || articleHeaderHidden) && 'pointer-events-none -translate-y-[calc(100%+0.75rem)] max-h-0 overflow-hidden !mt-0 !border-0 !py-0 opacity-0',
         )}
-        aria-hidden={headerHidden}
-        inert={headerHidden}
+        aria-hidden={headerHidden || articleHeaderHidden}
+        inert={headerHidden || articleHeaderHidden}
       >
         <Brand />
         <button

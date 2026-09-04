@@ -6,6 +6,7 @@ import com.codespar.config.LoginRateLimiter;
 import com.codespar.model.dto.AuthDTO;
 import com.codespar.web.ApiExceptionHandler.BizException;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -25,12 +26,13 @@ public class AuthController {
 
     private final AccessPasswordStore store;
     private final LoginRateLimiter rateLimiter;
+    private final AccessSessions sessions;
 
     @GetMapping("/status")
     public AuthDTO.Status status(HttpServletRequest request) {
         AuthDTO.Status s = new AuthDTO.Status();
         s.setEnabled(store.isEnabled());
-        s.setUnlocked(AccessSessions.isUnlocked(request, store));
+        s.setUnlocked(sessions.isUnlocked(request));
         s.setManagedByConfig(store.isManagedByConfig());
         return s;
     }
@@ -38,7 +40,8 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<Map<String, String>> login(
             @RequestBody AuthDTO.LoginRequest req,
-            HttpServletRequest request) {
+            HttpServletRequest request,
+            HttpServletResponse response) {
         if (!store.isEnabled()) {
             throw new BizException("当前未启用访问口令");
         }
@@ -54,22 +57,23 @@ public class AuthController {
                     .body(Map.of("message", "口令不正确"));
         }
         rateLimiter.recordSuccess(ip);
-        AccessSessions.grant(request, store);
+        sessions.grant(request, response);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(HttpServletRequest request) {
-        AccessSessions.revoke(request);
+    public ResponseEntity<Void> logout(HttpServletRequest request, HttpServletResponse response) {
+        sessions.revoke(request, response);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/password")
     public ResponseEntity<Void> changePassword(
             @Valid @RequestBody AuthDTO.ChangePasswordRequest req,
-            HttpServletRequest request) {
+            HttpServletRequest request,
+            HttpServletResponse response) {
         store.changePassword(req.getCurrentPassword(), req.getNewPassword());
-        AccessSessions.refreshGeneration(request, store);
+        sessions.grant(request, response);
         return ResponseEntity.noContent().build();
     }
 

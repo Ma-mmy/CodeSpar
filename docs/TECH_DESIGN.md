@@ -240,7 +240,7 @@ PRD 要求 JSON 解析成功率 > 95%。这是全项目最大的不确定性来�
 
 ### 5.4 访问口令与远程访问
 
-不上账号。一个实例一把口令：配置 `CODESPAR_ACCESS_PASSWORD` 是默认值，设置页改过之后以 `access.hash` 为准。会话 Cookie `CODESPAR_SID`（HttpOnly、SameSite=Lax），SSE 同源自动带 Cookie。
+不上账号。一个实例一把口令：配置 `CODESPAR_ACCESS_PASSWORD` 是默认值，设置页改过之后以 `access.hash` 为准。解锁凭证是有效期 7 天的加密 Cookie `CODESPAR_SID`（HttpOnly、SameSite=Lax），后端重启后仍可校验，SSE 同源自动带 Cookie；退出或修改口令会使旧凭证失效。
 
 - 未设口令且只听 `127.0.0.1`：本机免解锁（开发默认）
 - 听非回环地址却没口令：**拒绝启动**

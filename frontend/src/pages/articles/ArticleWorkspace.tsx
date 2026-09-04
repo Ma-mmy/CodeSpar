@@ -112,37 +112,25 @@ export function ArticleWorkspace({
 
   useEffect(() => {
     if (!scrollRoot || isMd) return
-    let anchor = scrollRoot.scrollTop
     let hiddenState = false
     let ticking = false
-    let lastToggleAt = 0
+
+    const setHeaderHidden = (hidden: boolean) => {
+      if (hidden === hiddenState) return
+      hiddenState = hidden
+      setTopBarHidden(hidden)
+      window.dispatchEvent(new CustomEvent('codespar:article-header', { detail: { hidden } }))
+    }
+
     const onScroll = () => {
       if (ticking) return
       ticking = true
       requestAnimationFrame(() => {
         ticking = false
-        const current = scrollRoot.scrollTop
-        if (current <= 16 && hiddenState) {
-          hiddenState = false
-          lastToggleAt = performance.now()
-          setTopBarHidden(false)
-          window.dispatchEvent(new CustomEvent('codespar:article-header', { detail: { hidden: false } }))
-          anchor = current
-          return
-        }
-        const delta = current - anchor
-        if (Math.abs(delta) >= 36 && performance.now() - lastToggleAt >= 280) {
-          const hidden = delta > 0
-          if (hidden !== hiddenState) {
-            hiddenState = hidden
-            lastToggleAt = performance.now()
-            setTopBarHidden(hidden)
-            window.dispatchEvent(new CustomEvent('codespar:article-header', { detail: { hidden } }))
-          }
-          anchor = current
-        }
+        setHeaderHidden(scrollRoot.scrollTop > 1)
       })
     }
+    onScroll()
     scrollRoot.addEventListener('scroll', onScroll, { passive: true })
     return () => {
       scrollRoot.removeEventListener('scroll', onScroll)

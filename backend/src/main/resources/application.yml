@@ -103,3 +103,4 @@ logging:
   level:
     com.codespar: INFO
     org.springframework.ai: INFO
+    root: info

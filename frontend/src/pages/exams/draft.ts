@@ -34,6 +34,14 @@ export function saveDraft(examId: number, answers: DraftMap) {
   localStorage.setItem(key(examId), JSON.stringify(payload))
 }
 
+/** 丢弃不再属于当前试卷的本地答案，避免恢复旧草稿时回传无效题目 ID。 */
+export function filterAnswersByQuestionIds(answers: DraftMap, questionIds: Iterable<number>): DraftMap {
+  const validIds = new Set(questionIds)
+  return Object.fromEntries(
+    Object.entries(answers).filter(([qid]) => validIds.has(Number(qid))),
+  )
+}
+
 export function clearDraft(examId: number) {
   localStorage.removeItem(key(examId))
 }

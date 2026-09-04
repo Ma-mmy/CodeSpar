@@ -37,6 +37,7 @@ import { modelsApi } from '@/api/models'
 import { examsApi, type ExamDetail, type QuestionForTaking } from '@/api/exams'
 import {
   clearDraft,
+  filterAnswersByQuestionIds,
   isAnswered,
   loadDraft,
   loadNavMode,
@@ -332,8 +333,14 @@ export function TakeExamPage() {
           return
         }
         const serverAnswers = await examsApi.answers(examId)
-        const local = loadDraft(examId)
-        const merged = mergeAnswers(serverAnswers, local)
+        const local = filterAnswersByQuestionIds(
+          loadDraft(examId),
+          detail.questions.map((q) => q.id),
+        )
+        const merged = filterAnswersByQuestionIds(
+          mergeAnswers(serverAnswers, local),
+          detail.questions.map((q) => q.id),
+        )
         if (!cancelled) {
           setExam(detail)
           setAnswers(merged)

@@ -285,10 +285,10 @@ export function ArticleWorkspace({
           <div
             className="contents"
             onClick={(event) => {
-              if (!isMd && (event.target as HTMLElement).closest('[data-open-directory]')) setTreeOpen(true)
+              if ((event.target as HTMLElement).closest('[data-open-directory]')) setTreeOpen(true)
             }}
             onKeyDown={(event) => {
-              if (!isMd && (event.key === 'Enter' || event.key === ' ') && (event.target as HTMLElement).closest('[data-open-directory]')) {
+              if ((event.key === 'Enter' || event.key === ' ') && (event.target as HTMLElement).closest('[data-open-directory]')) {
                 event.preventDefault()
                 setTreeOpen(true)
               }

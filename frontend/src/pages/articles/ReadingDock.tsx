@@ -41,7 +41,9 @@ export function ReadingDock({
     <div
       ref={boxRef}
       className={cn(
-        'pointer-events-auto absolute bottom-5 right-5 z-20 flex flex-col items-end',
+        // Keep the reader controls attached to the viewport instead of the
+        // article workspace, which can be taller than the mobile viewport.
+        'pointer-events-auto fixed right-5 bottom-5 z-40 flex flex-col items-end',
         'opacity-45 transition-opacity duration-300 hover:opacity-100',
         (typeOpen || zen) && 'opacity-100',
       )}

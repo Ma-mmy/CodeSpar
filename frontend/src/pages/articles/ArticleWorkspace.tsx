@@ -203,7 +203,7 @@ export function ArticleWorkspace({
         <button
           type="button"
           title="展开目录"
-          className="glass absolute top-1/2 left-3 z-20 flex h-12 w-5 -translate-y-1/2 items-center justify-center rounded-r-lg rounded-l-none border-l-0"
+          className="glass fixed top-1/2 left-3 z-20 flex h-12 w-5 -translate-y-1/2 items-center justify-center rounded-r-lg rounded-l-none border-l-0"
           onClick={() => setTreeOpen(true)}
         >
           <ChevronRight className="size-3" />
@@ -214,7 +214,7 @@ export function ArticleWorkspace({
         <button
           type="button"
           title="展开目录"
-          className="glass absolute top-1/2 left-3 z-20 flex h-12 w-5 -translate-y-1/2 items-center justify-center rounded-r-lg rounded-l-none border-l-0 md:hidden"
+          className="glass fixed top-1/2 left-3 z-20 flex h-12 w-5 -translate-y-1/2 items-center justify-center rounded-r-lg rounded-l-none border-l-0 md:hidden"
           onClick={() => setTreeOpen(true)}
         >
           <ChevronRight className="size-3" />
@@ -228,16 +228,22 @@ export function ArticleWorkspace({
           zen && 'mx-auto h-full max-w-[860px]',
         )}
       >
-        <div className="shrink-0">
-          <section className={cn('glass rounded-2xl px-5 py-3.5', zen && 'bg-transparent shadow-none')}>
-            {topBar}
-          </section>
-        </div>
+        {(!zen || isMd) && (
+          <div className="shrink-0">
+            <section className={cn('glass rounded-2xl px-5 py-3.5', zen && 'bg-transparent shadow-none')}>
+              {topBar}
+            </section>
+          </div>
+        )}
         <section
           ref={setScrollRoot}
           className={cn(
             'article-reader relative rounded-2xl px-6 py-6 sm:px-9 sm:pb-20',
-            isMd ? 'min-h-0 flex-1 overflow-y-auto' : 'overflow-visible',
+            zen
+              ? 'min-h-0 flex-1 overflow-y-auto'
+              : isMd
+                ? 'min-h-0 flex-1 overflow-y-auto'
+                : 'overflow-visible',
             zen ? 'bg-transparent' : 'glass',
           )}
         >
@@ -274,7 +280,7 @@ export function ArticleWorkspace({
         <button
           type="button"
           title="展开大纲"
-          className="glass absolute top-1/2 right-3 z-20 flex h-12 w-5 -translate-y-1/2 items-center justify-center rounded-l-lg rounded-r-none border-r-0"
+          className="glass fixed top-1/2 right-3 z-20 flex h-12 w-5 -translate-y-1/2 items-center justify-center rounded-l-lg rounded-r-none border-r-0"
           onClick={() => setTocOpen(true)}
         >
           <ChevronLeft className="size-3" />
@@ -285,14 +291,14 @@ export function ArticleWorkspace({
         <button
           type="button"
           title="展开大纲"
-          className="glass absolute top-1/2 right-3 z-20 flex h-12 w-5 -translate-y-1/2 items-center justify-center rounded-l-lg rounded-r-none border-r-0 md:hidden"
+          className="glass fixed top-1/2 right-3 z-20 flex h-12 w-5 -translate-y-1/2 items-center justify-center rounded-l-lg rounded-r-none border-r-0 md:hidden"
           onClick={() => setTocOpen(true)}
         >
           <ChevronLeft className="size-3" />
         </button>
       )}
 
-      {showDock && (
+      {showDock && (!zen || isMd) && (
         <ReadingDock
           zen={zen}
           onToggleZen={toggleZen}

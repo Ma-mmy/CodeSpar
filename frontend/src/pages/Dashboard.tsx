@@ -29,7 +29,6 @@ import {
   EmptyState,
   GlassCard,
   PageContainer,
-  PageHeader,
   Progress,
   Select,
   SelectContent,
@@ -61,6 +60,68 @@ const TOOLTIP_STYLE: CSSProperties = {
 }
 
 const TICK = { fill: 'var(--muted-foreground)', fontSize: 12 } as const
+
+const DASHBOARD_MESSAGES = [
+  '题海不用狂澜，灵机自破难关。准备好开启今日研习了吗？',
+  '何须苦渡无涯海，巧思一点意自闲。今日练笔，从容以对。',
+  '贪多不如得趣，博闻贵在心清。抽一缕闲暇，练两三关隘。',
+  '莫谓前路漫漫，点滴皆是通途。静候下笔，渐入佳境。',
+  '磨砚正宜此时，破关且待今朝。智能题库已备，静候君来。',
+  '辨瑕始知胜处，淬锋方显奇功。挑几道好题，试一试手笔。',
+  '见微知漏明方向，下笔千钧现真章。今日的第一关，交给你了。',
+  '积跬步以致千里，汇纤尘以成泰山。每一次落笔，都是进阶的序曲。',
+  '偷得浮生半日闲，借题磨砺两三篇。',
+  '哪有什么天生开窍，不过是随手破了一层窗户纸。',
+  '题海里别较劲，顺着思路走，顺手就解开了。',
+  '累了就放一放，心闲下来，答案自己就冒出来了。',
+] as const
+
+function DashboardHeader() {
+  const [messageIndex, setMessageIndex] = useState(() => Math.floor(Math.random() * DASHBOARD_MESSAGES.length))
+  const [messageVisible, setMessageVisible] = useState(true)
+
+  useEffect(() => {
+    const pickRandomMessage = (current: number) => {
+      const offset = Math.floor(Math.random() * (DASHBOARD_MESSAGES.length - 1)) + 1
+      return (current + offset) % DASHBOARD_MESSAGES.length
+    }
+
+    let swapTimer: number | undefined
+    const interval = window.setInterval(() => {
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        setMessageIndex(pickRandomMessage)
+        return
+      }
+
+      setMessageVisible(false)
+      swapTimer = window.setTimeout(() => {
+        setMessageIndex(pickRandomMessage)
+        setMessageVisible(true)
+      }, 300)
+    }, 20000)
+
+    return () => {
+      window.clearInterval(interval)
+      if (swapTimer !== undefined) window.clearTimeout(swapTimer)
+    }
+  }, [])
+
+  return (
+    <header className="w-full sm:min-w-0 sm:flex-1">
+      <h1 className="text-[22px] font-semibold tracking-tight sm:text-3xl">仪表盘</h1>
+      <div className="mt-1.5 h-10 overflow-hidden sm:h-6">
+        <p
+          className={cn(
+            'text-sm text-muted-foreground transition-[opacity,transform] duration-300 ease-out sm:text-[15px]',
+            messageVisible ? 'translate-y-0 opacity-100' : '-translate-y-1.5 opacity-0',
+          )}
+        >
+          {DASHBOARD_MESSAGES[messageIndex]}
+        </p>
+      </div>
+    </header>
+  )
+}
 
 function pct(rate?: number | null) {
   if (rate == null || Number.isNaN(Number(rate))) return '—'
@@ -185,10 +246,7 @@ export function Dashboard() {
   return (
     <PageContainer>
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3 sm:mb-8">
-        <PageHeader
-          title="仪表盘"
-          description="按知识点看弱项、按题型看表达、按时间看有没有进步。"
-        />
+        <DashboardHeader />
         <Button variant="primary" size="sm" onClick={() => navigate('/generate')}>
           <Sparkles />
           去出题

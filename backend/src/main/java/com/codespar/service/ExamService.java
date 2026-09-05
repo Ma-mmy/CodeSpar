@@ -49,7 +49,9 @@ public class ExamService {
 
     private static final Set<String> TAKEABLE = Set.of("NOT_STARTED", "IN_PROGRESS");
     private static final Set<String> READONLY = Set.of("SUBMITTED", "GRADED");
-    /** 文章开卷弹窗里的历史卷条数上限。 */
+    /**
+     * 文章开卷弹窗里的历史卷条数上限。
+     */
     static final int ARTICLE_HISTORY_LIMIT = 3;
 
     private final ExamMapper examMapper;
@@ -203,7 +205,9 @@ public class ExamService {
         return getForTaking(id);
     }
 
-    /** 保存/更新单题作答。仅 IN_PROGRESS。 */
+    /**
+     * 保存/更新单题作答。仅 IN_PROGRESS。
+     */
     @Transactional
     public AnswerView saveAnswer(Long examId, Long questionId, SaveAnswerRequest req) {
         Exam exam = getRequired(examId);
@@ -430,7 +434,9 @@ public class ExamService {
         return v;
     }
 
-    /** 答题可见字段 —— 不碰 correctAnswer / referenceAnswer / rubric / explanation。 */
+    /**
+     * 答题可见字段 —— 不碰 correctAnswer / referenceAnswer / rubric / explanation。
+     */
     private QuestionForTaking toTakingQuestion(Integer seq, Question q) {
         QuestionForTaking v = new QuestionForTaking();
         v.setId(q.getId());
@@ -440,7 +446,8 @@ public class ExamService {
         v.setStem(q.getStem());
         v.setFullScore(q.getFullScore());
         List<QuestionBatchDTO.Option> options =
-                converter.parseList(q.getOptionsJson(), new TypeReference<>() {});
+                converter.parseList(q.getOptionsJson(), new TypeReference<>() {
+                });
         v.setOptions(options);
         return v;
     }

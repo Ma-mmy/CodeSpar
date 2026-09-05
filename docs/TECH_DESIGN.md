@@ -260,7 +260,7 @@ GET  /api/generations/{id}/stream  → Flux<ServerSentEvent> 实时进度
 ```
 1. 落库 GenerationJob(status=RUNNING)，返回 jobId
 2. 按题型拆批：[选择×5] [填空×3] [问答×4] [设计×1]
-3. 去重上下文：查同标签历史题干 → 摘要 → 注入各批 prompt（PRD F3.2 事前防线）
+3. 移除去重
 4. 虚拟线程并发执行 4 批，Semaphore 限并发（默认 4，可配）
    每批：构造 prompt → 调模型 → 宽松解析 → 业务校验 → 失败重试
    每批完成 → sink.tryEmitNext(进度事件)

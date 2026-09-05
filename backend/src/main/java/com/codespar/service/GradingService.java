@@ -847,6 +847,7 @@ public class GradingService {
             }
             BigDecimal rate = LocalScorer.rate(qg.getScore(), qg.getFullScore());
             WrongQuestion existing = wrongQuestionMapper.selectByQuestionId(qg.getQuestionId());
+
             if (rate.doubleValue() < wrongBookThreshold) {
                 if (existing == null) {
                     WrongQuestion w = new WrongQuestion();

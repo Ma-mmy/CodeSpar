@@ -85,6 +85,3 @@ cp .env.local.example .env.local
 模型接入统一走 **OpenAI 兼容协议**（baseURL + apiKey + model 名），代码里没有任何厂商判断，
 因此 DeepSeek / Kimi / 智谱 / OpenRouter / 硅基流动 / 本地 Ollama / 公司内网网关都能直接接入。
 通义千问额外支持 DashScope 原生接入。
-
-- 产品需求：[docs/PRD.md](docs/PRD.md)
-- 技术方案：[docs/TECH_DESIGN.md](docs/TECH_DESIGN.md)

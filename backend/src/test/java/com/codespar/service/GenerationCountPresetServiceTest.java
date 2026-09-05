@@ -29,8 +29,10 @@ class GenerationCountPresetServiceTest {
     }
 
     @Test
-    void defaultsSumToFourteen() {
-        int total = GenerationCountPresetService.defaults().values().stream().mapToInt(Integer::intValue).sum();
-        assertEquals(14, total);
+    void defaultsUseObjectiveQuestionMix() {
+        assertEquals(Map.of(
+                QuestionType.SINGLE_CHOICE, 10,
+                QuestionType.TRUE_FALSE, 2,
+                QuestionType.FILL_BLANK, 3), GenerationCountPresetService.defaults());
     }
 }

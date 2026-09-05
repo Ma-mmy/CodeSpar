@@ -28,7 +28,7 @@ export function FolderTree({
   onSelectArticle: (id: number) => void
   onNewFolder: (parentId: number | null) => void
   onRenameFolder: (id: number, name: string) => void
-  onDeleteFolder: (id: number) => void
+  onDeleteFolder: (id: number, name: string) => void
 }) {
   const isVirtualRoot = node.id == null
   const open = isVirtualRoot || !collapsed.has(node.id!)
@@ -107,7 +107,7 @@ export function FolderTree({
           type="button"
           title="删除空文件夹"
           className="rounded p-1 opacity-0 transition group-hover:opacity-100 hover:bg-black/10 dark:hover:bg-white/10"
-          onClick={() => onDeleteFolder(node.id!)}
+          onClick={() => onDeleteFolder(node.id!, node.name)}
         >
           <Trash2 className="size-3.5" />
         </button>

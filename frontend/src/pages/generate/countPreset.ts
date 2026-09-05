@@ -5,12 +5,9 @@ export const MAX_QUESTIONS_PER_TYPE = 20
 
 /** 须与 GenerationCountPresetService.defaults 一致。 */
 export const DEFAULT_COUNT_PRESET: Partial<Record<QuestionType, number>> = {
-  SINGLE_CHOICE: 4,
-  MULTI_CHOICE: 2,
+  SINGLE_CHOICE: 10,
   TRUE_FALSE: 2,
-  FILL_BLANK: 2,
-  SHORT_ANSWER: 3,
-  SYSTEM_DESIGN: 1,
+  FILL_BLANK: 3,
 }
 
 const LEGACY_STORAGE_KEY = 'codespar.generate.count-preset'

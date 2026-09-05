@@ -7,8 +7,8 @@ const STORAGE_KEY = 'codespar-theme'
 function readStoredTheme(): Theme {
   const raw = localStorage.getItem(STORAGE_KEY)
   if (raw === 'light' || raw === 'dark' || raw === 'paper') return raw
-  // 旧版「跟随系统」并入浅色，避免选中态对不上第三个按钮
-  return 'light'
+  // 未设置或旧版无效值统一使用纸质主题
+  return 'paper'
 }
 
 function apply(theme: Theme) {

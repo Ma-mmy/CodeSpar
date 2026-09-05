@@ -112,6 +112,10 @@ export function ArticlesPage() {
     { mode: 'create'; parentId: number | null } | { mode: 'rename'; id: number; name: string } | null
   >(null)
   const [folderName, setFolderName] = useState('')
+  const [pendingFolderDelete, setPendingFolderDelete] = useState<{
+    id: number
+    name: string
+  } | null>(null)
   const [moveOpen, setMoveOpen] = useState(false)
   const [moveFolderId, setMoveFolderId] = useState('root')
 
@@ -121,6 +125,10 @@ export function ArticlesPage() {
   const [draftCategory, setDraftCategory] = useState('')
   const [draftBody, setDraftBody] = useState('')
   const [draftFolderId, setDraftFolderId] = useState<number | null>(null)
+  const [pendingArticleDelete, setPendingArticleDelete] = useState<{
+    id: number
+    title: string
+  } | null>(null)
 
   const detailQ = useQuery({
     queryKey: ['articles', selectedId],
@@ -224,6 +232,7 @@ export function ArticlesPage() {
   const removeArticle = useMutation({
     mutationFn: (id: number) => articlesApi.remove(id),
     onSuccess: () => {
+      setPendingArticleDelete(null)
       selectArticle(null)
       invalidateTree()
       toast('已删除文章', { variant: 'success' })
@@ -234,6 +243,7 @@ export function ArticlesPage() {
   const removeFolder = useMutation({
     mutationFn: (id: number) => articlesApi.removeFolder(id),
     onSuccess: () => {
+      setPendingFolderDelete(null)
       invalidateTree()
       toast('已删除文件夹', { variant: 'success' })
     },
@@ -563,9 +573,7 @@ export function ArticlesPage() {
                 setFolderName(name)
                 setFolderDialog({ mode: 'rename', id, name })
               }}
-              onDeleteFolder={(id) => {
-                if (confirm('确认删除该空文件夹？')) removeFolder.mutate(id)
-              }}
+              onDeleteFolder={(id, name) => setPendingFolderDelete({ id, name })}
             />
           )
         }
@@ -615,11 +623,7 @@ export function ArticlesPage() {
                     variant="secondary"
                     size="icon-sm"
                     aria-label="删除文章"
-                    onClick={() => {
-                      if (confirm('删除文章将同时删除其未交卷；已交卷会保留但断联来源。确认？')) {
-                        removeArticle.mutate(article.id)
-                      }
-                    }}
+                    onClick={() => setPendingArticleDelete({ id: article.id, title: article.title })}
                   >
                     <Trash2 className="size-4" />
                   </Button>
@@ -725,6 +729,76 @@ export function ArticlesPage() {
           else saveArticle.mutate()
         }}
       />
+
+      <Dialog
+        open={!!pendingArticleDelete}
+        onOpenChange={(open) =>
+          !open && !removeArticle.isPending && setPendingArticleDelete(null)
+        }
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>删除这篇文章？</DialogTitle>
+            <DialogDescription>
+              将删除「{pendingArticleDelete?.title}」及其未交卷的试卷。已交卷的试卷会保留，但不再关联这篇文章。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={removeArticle.isPending}
+              onClick={() => setPendingArticleDelete(null)}
+            >
+              取消
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              loading={removeArticle.isPending}
+              onClick={() =>
+                pendingArticleDelete && removeArticle.mutate(pendingArticleDelete.id)
+              }
+            >
+              确认删除
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!pendingFolderDelete}
+        onOpenChange={(open) =>
+          !open && !removeFolder.isPending && setPendingFolderDelete(null)
+        }
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>删除这个文件夹？</DialogTitle>
+            <DialogDescription>
+              将删除空文件夹「{pendingFolderDelete?.name}」。包含子文件夹或文章时无法删除。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={removeFolder.isPending}
+              onClick={() => setPendingFolderDelete(null)}
+            >
+              取消
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              loading={removeFolder.isPending}
+              onClick={() => pendingFolderDelete && removeFolder.mutate(pendingFolderDelete.id)}
+            >
+              确认删除
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!folderDialog} onOpenChange={(o) => !o && setFolderDialog(null)}>
         <DialogContent>

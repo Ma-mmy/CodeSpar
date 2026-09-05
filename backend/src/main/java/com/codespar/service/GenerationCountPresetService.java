@@ -64,12 +64,9 @@ public class GenerationCountPresetService {
 
     static Map<QuestionType, Integer> defaults() {
         Map<QuestionType, Integer> d = new LinkedHashMap<>();
-        d.put(QuestionType.SINGLE_CHOICE, 4);
-        d.put(QuestionType.MULTI_CHOICE, 2);
+        d.put(QuestionType.SINGLE_CHOICE, 10);
         d.put(QuestionType.TRUE_FALSE, 2);
-        d.put(QuestionType.FILL_BLANK, 2);
-        d.put(QuestionType.SHORT_ANSWER, 3);
-        d.put(QuestionType.SYSTEM_DESIGN, 1);
+        d.put(QuestionType.FILL_BLANK, 3);
         return d;
     }
 

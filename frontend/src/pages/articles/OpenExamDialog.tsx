@@ -198,7 +198,6 @@ export function OpenExamDialog({
 
           <div>
             <h3 className="mb-2 text-sm font-medium">历史卷</h3>
-            <p className="mb-2 text-xs text-muted-foreground">只保留最近 3 套</p>
             {examsQ.isLoading ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="size-4 animate-spin" /> 加载中…

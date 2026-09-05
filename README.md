@@ -1,26 +1,10 @@
 # CodeSpar
 
-面向 Agent 工程师的 LLM 驱动模考与复盘系统。
+基于 LLM 驱动模考与复盘系统。
 
 你写一段提示词描述想考什么，指定题型、数量、难度与知识点，由你选定的模型现场生成一整套试卷；
 答完后由模型对照出题时同步产出的评分要点逐点打分、点评。题目与阅卷结果沉淀成你的能力画像，
 告诉你下一轮该攻哪里。
-
-- 产品需求：[docs/PRD.md](docs/PRD.md)
-- 技术方案：[docs/TECH_DESIGN.md](docs/TECH_DESIGN.md)
-
-## 技术栈
-
-| 层 | 选型 |
-|----|------|
-| 后端 | Java 21 · Spring Boot 3.5.4 · Spring AI 1.1.2 · Spring AI Alibaba 1.1.2.0 · MyBatis-Plus 3.5.12 · Flyway |
-| 数据库 | SQLite 3.x（xerial JDBC，单文件 `~/.codespar/codespar.db`） |
-| 前端 | React 19 · Vite 8 · TypeScript · Tailwind v4 · TanStack Query · Recharts |
-| 打包 | 前端产物内嵌进 Spring Boot jar，单进程、同源、无跨域 |
-
-模型接入统一走 **OpenAI 兼容协议**（baseURL + apiKey + model 名），代码里没有任何厂商判断，
-因此 DeepSeek / Kimi / 智谱 / OpenRouter / 硅基流动 / 本地 Ollama / 公司内网网关都能直接接入。
-通义千问额外支持 DashScope 原生接入。
 
 ## 首次运行
 
@@ -88,3 +72,19 @@ cp .env.local.example .env.local
 - [x] **主分类筛选** — 粗粒度白名单分类；出题必选；试卷/出题历史/阅卷历史可筛
 - [x] **能力仪表盘** — 弱项标签排行、题型得分、趋势曲线、累计统计、针对弱项出题
 - [x] **错题本** — 自动入库、手动增删、按标签组卷重刷
+
+## 技术栈
+
+| 层 | 选型 |
+|----|------|
+| 后端 | Java 21 · Spring Boot 3.5.4 · Spring AI 1.1.2 · Spring AI Alibaba 1.1.2.0 · MyBatis-Plus 3.5.12 · Flyway |
+| 数据库 | SQLite 3.x（xerial JDBC，单文件 `~/.codespar/codespar.db`） |
+| 前端 | React 19 · Vite 8 · TypeScript · Tailwind v4 · TanStack Query · Recharts |
+| 打包 | 前端产物内嵌进 Spring Boot jar，单进程、同源、无跨域 |
+
+模型接入统一走 **OpenAI 兼容协议**（baseURL + apiKey + model 名），代码里没有任何厂商判断，
+因此 DeepSeek / Kimi / 智谱 / OpenRouter / 硅基流动 / 本地 Ollama / 公司内网网关都能直接接入。
+通义千问额外支持 DashScope 原生接入。
+
+- 产品需求：[docs/PRD.md](docs/PRD.md)
+- 技术方案：[docs/TECH_DESIGN.md](docs/TECH_DESIGN.md)

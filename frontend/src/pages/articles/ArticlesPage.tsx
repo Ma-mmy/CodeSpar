@@ -68,10 +68,10 @@ type EditorMode = 'create' | 'edit'
 type ArticleSort = 'updated-desc' | 'updated-asc' | 'title-asc' | 'title-desc'
 
 const ARTICLE_SORTS: { value: ArticleSort; label: string; icon: LucideIcon }[] = [
-  { value: 'updated-desc', label: '更新时间：新到旧', icon: CalendarArrowDown },
-  { value: 'updated-asc', label: '更新时间：旧到新', icon: CalendarArrowUp },
-  { value: 'title-asc', label: '标题：数字从小到大，字母 A 到 Z', icon: ArrowDownAZ },
-  { value: 'title-desc', label: '标题：数字从大到小，字母 Z 到 A', icon: ArrowUpZA },
+  { value: 'updated-desc', label: '更新时间：降序', icon: CalendarArrowDown },
+  { value: 'updated-asc', label: '更新时间：升序', icon: CalendarArrowUp },
+  { value: 'title-asc', label: '标题：升序', icon: ArrowDownAZ },
+  { value: 'title-desc', label: '标题：降序', icon: ArrowUpZA },
 ]
 
 const ARTICLE_SORT_PREF = 'sort'
@@ -480,7 +480,7 @@ export function ArticlesPage() {
             }}
           >
             <ActiveSortIcon className="size-4" />
-            排序：{activeSort.label}
+            排序
           </button>
           <button
             type="button"

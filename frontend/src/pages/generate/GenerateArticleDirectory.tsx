@@ -37,10 +37,10 @@ import { cn } from '@/lib/utils'
 type SortMode = 'created-desc' | 'created-asc' | 'name-asc' | 'name-desc'
 
 const SORT_OPTIONS: { value: SortMode; label: string; icon: LucideIcon }[] = [
-  { value: 'created-desc', label: '创建时间：新到旧', icon: CalendarArrowDown },
-  { value: 'created-asc', label: '创建时间：旧到新', icon: CalendarArrowUp },
-  { value: 'name-asc', label: '文件名：数字从小到大，字母 A 到 Z', icon: ArrowDownAZ },
-  { value: 'name-desc', label: '文件名：数字从大到小，字母 Z 到 A', icon: ArrowUpZA },
+  { value: 'created-desc', label: '创建时间：降序', icon: CalendarArrowDown },
+  { value: 'created-asc', label: '创建时间：升序', icon: CalendarArrowUp },
+  { value: 'name-asc', label: '文件名：升序', icon: ArrowDownAZ },
+  { value: 'name-desc', label: '文件名：降序', icon: ArrowUpZA },
 ]
 
 const STATUS_VARIANT: Record<SummaryStatus, 'success' | 'warning' | 'danger' | 'neutral' | 'primary'> = {

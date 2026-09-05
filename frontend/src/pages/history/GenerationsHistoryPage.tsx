@@ -175,6 +175,7 @@ export function GenerationsHistoryPage() {
   const [statusFilter, setStatusFilter] = useState<string>('ALL')
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL')
   const [expandedId, setExpandedId] = useState<number | null>(null)
+  const [pendingRerun, setPendingRerun] = useState<GenerationView | null>(null)
   const [pendingDelete, setPendingDelete] = useState<GenerationView | null>(null)
 
   const { data, isLoading, error } = useQuery({
@@ -197,6 +198,7 @@ export function GenerationsHistoryPage() {
   const rerun = useMutation({
     mutationFn: (id: number) => generationApi.rerun(id),
     onSuccess: (res) => {
+      setPendingRerun(null)
       qc.invalidateQueries({ queryKey: ['generations'] })
       toast('已用相同参数重新出题', { variant: 'success' })
       navigate(`/generate/${res.id}`)
@@ -289,6 +291,37 @@ export function GenerationsHistoryPage() {
         </GlassCard>
       )}
 
+      <Dialog
+        open={!!pendingRerun}
+        onOpenChange={(open) => !open && !rerun.isPending && setPendingRerun(null)}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>用相同参数再出一套题？</DialogTitle>
+            <DialogDescription>
+              将复制这条记录的出题描述、题型数量、难度、知识点和模型等参数，创建新的出题任务并立即开始生成。原记录不会改变，生成会再次产生模型用量。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="secondary"
+              disabled={rerun.isPending}
+              onClick={() => setPendingRerun(null)}
+            >
+              取消
+            </Button>
+            <Button
+              variant="primary"
+              loading={rerun.isPending}
+              onClick={() => pendingRerun && rerun.mutate(pendingRerun.id)}
+            >
+              <RefreshCw />
+              确认再来一次
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!pendingDelete} onOpenChange={(o) => !o && setPendingDelete(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -320,7 +353,7 @@ export function GenerationsHistoryPage() {
               job={job}
               expanded={expandedId === job.id}
               onToggle={() => setExpandedId((id) => (id === job.id ? null : job.id))}
-              onRerun={() => rerun.mutate(job.id)}
+              onRerun={() => setPendingRerun(job)}
               rerunning={rerun.isPending && rerun.variables === job.id}
               onDelete={() => setPendingDelete(job)}
               deleting={remove.isPending && remove.variables === job.id}

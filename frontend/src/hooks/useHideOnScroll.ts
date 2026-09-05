@@ -1,10 +1,8 @@
 import { useEffect, useState } from 'react'
 
 const MOBILE_MQ = '(max-width: 767px)'
-const OFFSET = 48
-const TOLERANCE = 8
 
-/** 手机端根据滚动方向隐藏顶栏：上滑收起，下滑带回。桌面端始终展开。 */
+/** 手机端仅在页面顶部展示顶栏；桌面端始终展开。 */
 export function useHideOnScroll({
   resetKey,
   enabled = true,
@@ -15,15 +13,19 @@ export function useHideOnScroll({
   const [hidden, setHidden] = useState(false)
 
   useEffect(() => {
-    setHidden(false)
-    if (!enabled) return
+    if (!enabled) {
+      setHidden(false)
+      return
+    }
 
     const mq = window.matchMedia(MOBILE_MQ)
-    if (!mq.matches) return
+    if (!mq.matches) {
+      setHidden(false)
+      return
+    }
 
-    let lastY = window.scrollY
     let ticking = false
-    let current = false
+    let current = window.scrollY > 1
 
     const apply = (next: boolean) => {
       if (next === current) return
@@ -33,11 +35,7 @@ export function useHideOnScroll({
 
     const update = () => {
       ticking = false
-      const y = Math.max(0, window.scrollY)
-      if (y <= OFFSET) apply(false)
-      else if (y > lastY + TOLERANCE) apply(true)
-      else if (y < lastY - TOLERANCE) apply(false)
-      lastY = y
+      apply(window.scrollY > 1)
     }
 
     const onScroll = () => {
@@ -48,8 +46,10 @@ export function useHideOnScroll({
 
     const onMq = () => {
       if (!mq.matches) apply(false)
+      else update()
     }
 
+    apply(current)
     window.addEventListener('scroll', onScroll, { passive: true })
     mq.addEventListener('change', onMq)
     return () => {

@@ -53,7 +53,6 @@ export function ArticleWorkspace({
   const [lineHeight, setLineHeight] = useState(() =>
     readNumberPref('lineHeight', LH_DEFAULT, LH_MIN, LH_MAX),
   )
-  const [topBarHidden, setTopBarHidden] = useState(false)
 
   useEffect(() => {
     const mq = window.matchMedia('(min-width: 768px)')
@@ -109,34 +108,6 @@ export function ArticleWorkspace({
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
   }, [toggleZen, zen])
-
-  useEffect(() => {
-    if (!scrollRoot || isMd) return
-    let hiddenState = false
-    let ticking = false
-
-    const setHeaderHidden = (hidden: boolean) => {
-      if (hidden === hiddenState) return
-      hiddenState = hidden
-      setTopBarHidden(hidden)
-      window.dispatchEvent(new CustomEvent('codespar:article-header', { detail: { hidden } }))
-    }
-
-    const onScroll = () => {
-      if (ticking) return
-      ticking = true
-      requestAnimationFrame(() => {
-        ticking = false
-        setHeaderHidden(scrollRoot.scrollTop > 1)
-      })
-    }
-    onScroll()
-    scrollRoot.addEventListener('scroll', onScroll, { passive: true })
-    return () => {
-      scrollRoot.removeEventListener('scroll', onScroll)
-      window.dispatchEvent(new CustomEvent('codespar:article-header', { detail: { hidden: false } }))
-    }
-  }, [scrollRoot, isMd])
 
   useEffect(() => {
     if (treeCollapsed || isMd) return
@@ -203,10 +174,9 @@ export function ArticleWorkspace({
         'article-workspace relative',
         zen
           ? 'fixed inset-0 z-40 flex overflow-hidden bg-background p-6'
-          : cn(
-              'flex overflow-hidden p-3 transition-[height] duration-300 ease-out md:h-svh',
-              topBarHidden ? 'h-svh' : 'h-[calc(100svh-5.5rem)]',
-            ),
+          : isMd
+            ? 'flex h-svh overflow-hidden p-3'
+            : 'flex p-3',
       )}
       style={
         {
@@ -253,20 +223,21 @@ export function ArticleWorkspace({
 
       <div
         className={cn(
-          'relative flex min-w-0 flex-1 flex-col',
-          topBarHidden ? 'gap-0' : 'gap-3',
+          'relative flex min-w-0 flex-1 flex-col gap-3',
+          !isMd && 'min-h-0',
           zen && 'mx-auto h-full max-w-[860px]',
         )}
       >
-        <div className={cn('shrink-0 overflow-hidden transition-[max-height,opacity] duration-300 ease-out', topBarHidden ? 'max-h-0 opacity-0' : 'max-h-40 opacity-100')}>
-          <section className={cn('glass rounded-2xl px-5 py-3.5 transition-transform duration-300 ease-out', topBarHidden && '-translate-y-3', zen && 'bg-transparent shadow-none')}>
+        <div className="shrink-0">
+          <section className={cn('glass rounded-2xl px-5 py-3.5', zen && 'bg-transparent shadow-none')}>
             {topBar}
           </section>
         </div>
         <section
           ref={setScrollRoot}
           className={cn(
-            'article-reader relative min-h-0 flex-1 overflow-y-auto rounded-2xl px-6 py-6 sm:px-9 sm:pb-20',
+            'article-reader relative rounded-2xl px-6 py-6 sm:px-9 sm:pb-20',
+            isMd ? 'min-h-0 flex-1 overflow-y-auto' : 'overflow-visible',
             zen ? 'bg-transparent' : 'glass',
           )}
         >

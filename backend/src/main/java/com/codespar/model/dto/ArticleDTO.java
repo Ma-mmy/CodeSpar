@@ -1,5 +1,6 @@
 package com.codespar.model.dto;
 
+import com.codespar.model.enums.ArticleContextMode;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
@@ -125,6 +126,7 @@ public class ArticleDTO {
         private String summaryStatus;
         private String prompt;
         private String summaryMd;
+        private ArticleContextMode articleContextMode;
     }
 
     @Data

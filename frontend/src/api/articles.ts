@@ -1,5 +1,6 @@
 import { api, ApiError } from './client'
 import type { ExamListItem } from './exams'
+import type { ArticleContextMode } from './generation'
 
 export type SummaryStatus = 'NONE' | 'RUNNING' | 'READY' | 'FAILED' | 'STALE'
 
@@ -61,7 +62,8 @@ export interface OpenContext {
   categoryLabel?: string
   summaryStatus: SummaryStatus
   prompt: string
-  summaryMd: string
+  summaryMd?: string
+  articleContextMode: ArticleContextMode
 }
 
 export interface UpsertArticleBody {
@@ -108,7 +110,8 @@ export const articlesApi = {
     api.post<ArticleDetail>(`/articles/${id}/refine`, body ?? {}),
   updateSummary: (id: number, body: UpdateSummaryBody) =>
     api.put<ArticleDetail>(`/articles/${id}/summary`, body),
-  openContext: (id: number) => api.get<OpenContext>(`/articles/${id}/open-context`),
+  openContext: (id: number, articleContextMode: ArticleContextMode = 'SUMMARY') =>
+    api.get<OpenContext>(`/articles/${id}/open-context?articleContextMode=${articleContextMode}`),
   exams: (id: number) => api.get<ExamListItem[]>(`/articles/${id}/exams`),
 
   async upload(file: File, folderId?: number | null, category?: string) {

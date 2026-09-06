@@ -10,6 +10,7 @@ export type QuestionType =
 
 export type Difficulty = 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' | 'EXPERT'
 export type JobStatus = 'RUNNING' | 'SUCCESS' | 'PARTIAL' | 'FAILED' | 'CANCELLED'
+export type ArticleContextMode = 'SUMMARY' | 'ORIGINAL'
 
 export const QUESTION_TYPES: Record<QuestionType, string> = {
   SINGLE_CHOICE: '单选',
@@ -48,8 +49,9 @@ export interface RubricPoint {
 
 export interface GenerateRequest {
   prompt: string
-  /** 基于文章考点摘要出题时传入 */
+  /** 基于文章出题时传入；具体内容由 articleContextMode 决定 */
   articleId?: number
+  articleContextMode?: ArticleContextMode
   counts: Partial<Record<QuestionType, number>>
   difficulty: Difficulty
   tags: string[]
@@ -64,6 +66,7 @@ export interface GenerateRequest {
 export interface OptimizeRequest {
   prompt: string
   articleId?: number
+  articleContextMode?: ArticleContextMode
   counts?: Partial<Record<QuestionType, number>>
   difficulty?: Difficulty
   tags?: string[]
@@ -105,6 +108,7 @@ export interface GenerateParams {
   language?: string
   /** null / true = 自动优化；false = 跳过 */
   autoOptimize?: boolean
+  articleContextMode?: ArticleContextMode
 }
 
 export interface GenerationView {

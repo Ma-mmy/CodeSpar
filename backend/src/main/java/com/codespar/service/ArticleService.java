@@ -24,6 +24,7 @@ import com.codespar.model.entity.Article;
 import com.codespar.model.entity.ArticleFolder;
 import com.codespar.model.entity.Exam;
 import com.codespar.model.entity.ModelProfile;
+import com.codespar.model.enums.ArticleContextMode;
 import com.codespar.web.ApiExceptionHandler.BizException;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
@@ -394,14 +395,20 @@ public class ArticleService {
         return toDetail(getRequired(id));
     }
 
-    public OpenContext openContext(Long id) {
+    public OpenContext openContext(Long id, ArticleContextMode requestedMode) {
         Article a = getRequired(id);
         if (a.getSourcePath() != null && !notesPath.exists(a.getSourcePath())) throw new BizException("磁盘上的 Markdown 文件已缺失，无法开卷");
-        if (!"READY".equals(a.getSummaryStatus()) && !"STALE".equals(a.getSummaryStatus())) {
-            throw new BizException("请先完成考点摘要提炼后再开卷");
-        }
-        if (a.getSummaryMd() == null || a.getSummaryMd().isBlank()) {
-            throw new BizException("考点摘要为空，请重新提炼后再开卷");
+        ArticleContextMode mode = ArticleContextMode.orSummary(requestedMode);
+        if (mode == ArticleContextMode.SUMMARY) {
+            if (!"READY".equals(a.getSummaryStatus()) && !"STALE".equals(a.getSummaryStatus())) {
+                throw new BizException("请先完成考点摘要提炼后再开卷");
+            }
+            if (a.getSummaryMd() == null || a.getSummaryMd().isBlank()) {
+                throw new BizException("考点摘要为空，请重新提炼后再开卷");
+            }
+        } else {
+            String body = readBody(a);
+            if (body == null || body.isBlank()) throw new BizException("文章原文为空，无法开卷");
         }
         OpenContext ctx = new OpenContext();
         ctx.setArticleId(a.getId());
@@ -412,7 +419,10 @@ public class ArticleService {
         }
         ctx.setSummaryStatus(a.getSummaryStatus());
         ctx.setSummaryMd(a.getSummaryMd());
-        ctx.setPrompt("请根据文章《" + a.getTitle() + "》的考点摘要出题，侧重高频经典考点与工程实践。");
+        ctx.setArticleContextMode(mode);
+        ctx.setPrompt(mode == ArticleContextMode.ORIGINAL
+                ? "请根据文章《" + a.getTitle() + "》的原文出题，覆盖核心知识与工程实践。"
+                : "请根据文章《" + a.getTitle() + "》的考点摘要出题，侧重高频经典考点与工程实践。");
         return ctx;
     }
 
@@ -548,7 +558,7 @@ public class ArticleService {
             }
         }
     }
-    private String readBody(Article a) { return a.getSourcePath() == null ? a.getBodyMd() : notesPath.read(notesPath.article(a.getSourcePath()), NotesPath.MAX_ARTICLE_BYTES); }
+    String readBody(Article a) { return a.getSourcePath() == null ? a.getBodyMd() : notesPath.read(notesPath.article(a.getSourcePath()), NotesPath.MAX_ARTICLE_BYTES); }
 
     /* ========================================================== 摘要执行 */
 

@@ -29,7 +29,7 @@ public class GenerationJob {
     /** 主分类（粗粒度，ExamCategory.code） */
     private String category;
 
-    /** 来源文章（基于考点摘要出题）；可空 */
+    /** 来源文章；具体上下文模式保存在 paramsJson；可空 */
     private Long articleId;
 
     /** 出题参数快照（题型数量/难度/标签/语言），JSON 字符串 */

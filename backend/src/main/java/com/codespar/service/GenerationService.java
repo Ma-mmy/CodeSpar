@@ -13,7 +13,6 @@ import com.codespar.mapper.GenerationBatchMapper;
 import com.codespar.mapper.GenerationJobMapper;
 import com.codespar.mapper.QuestionMapper;
 import com.codespar.mapper.WrongQuestionMapper;
-import com.codespar.model.dto.GenerationDTO;
 import com.codespar.model.dto.GenerationDTO.BatchResultView;
 import com.codespar.model.dto.GenerationDTO.GenerateParams;
 import com.codespar.model.dto.GenerationDTO.GenerateRequest;
@@ -28,6 +27,7 @@ import com.codespar.model.entity.GenerationBatch;
 import com.codespar.model.entity.GenerationJob;
 import com.codespar.model.entity.ModelProfile;
 import com.codespar.model.entity.Question;
+import com.codespar.model.enums.ArticleContextMode;
 import com.codespar.model.enums.QuestionType;
 import com.codespar.web.ApiExceptionHandler.BizException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -77,6 +77,7 @@ public class GenerationService {
     private final ExamQuestionMapper examQuestionMapper;
     private final WrongQuestionMapper wrongQuestionMapper;
     private final ArticleMapper articleMapper;
+    private final ArticleService articleService;
     private final QuestionConverter converter;
     private final QuestionSaver questionSaver;
     private final QuestionTaggingService tagging;
@@ -106,6 +107,7 @@ public class GenerationService {
                              ExamQuestionMapper examQuestionMapper,
                              WrongQuestionMapper wrongQuestionMapper,
                              ArticleMapper articleMapper,
+                             ArticleService articleService,
                              QuestionConverter converter,
                              QuestionSaver questionSaver,
                              QuestionTaggingService tagging,
@@ -126,6 +128,7 @@ public class GenerationService {
         this.examQuestionMapper = examQuestionMapper;
         this.wrongQuestionMapper = wrongQuestionMapper;
         this.articleMapper = articleMapper;
+        this.articleService = articleService;
         this.converter = converter;
         this.questionSaver = questionSaver;
         this.tagging = tagging;
@@ -153,17 +156,10 @@ public class GenerationService {
         String categoryCode = categoryService.requireExistingOrNull(req.getCategory());
         req.setCategory(categoryCode);
         Long articleId = req.getArticleId();
+        ArticleContextMode articleContextMode = ArticleContextMode.orSummary(req.getArticleContextMode());
+        req.setArticleContextMode(articleContextMode);
         if (articleId != null) {
-            Article article = articleMapper.selectById(articleId);
-            if (article == null) {
-                throw new BizException("关联文章不存在：" + articleId);
-            }
-            if (!"READY".equals(article.getSummaryStatus()) && !"STALE".equals(article.getSummaryStatus())) {
-                throw new BizException("文章考点摘要未就绪，请先完成提炼后再出题");
-            }
-            if (article.getSummaryMd() == null || article.getSummaryMd().isBlank()) {
-                throw new BizException("文章考点摘要为空，请重新提炼后再出题");
-            }
+            validateArticleContext(articleId, articleContextMode);
         }
 
         GenerationJob job = new GenerationJob();
@@ -220,6 +216,7 @@ public class GenerationService {
         req.setModelProfileId(modelId);
         req.setLanguage(params.getLanguage() == null ? "zh" : params.getLanguage());
         req.setArticleId(src.getArticleId());
+        req.setArticleContextMode(ArticleContextMode.orSummary(params.getArticleContextMode()));
         req.setAutoOptimize(params.shouldAutoOptimize());
         return create(req);
     }
@@ -234,15 +231,8 @@ public class GenerationService {
             throw new BizException("该模型未启用「可用于出题」，请到设置开启");
         }
         String categoryCode = categoryService.requireExistingOrNull(req.getCategory());
-        if (req.getArticleId() != null) {
-            Article article = articleMapper.selectById(req.getArticleId());
-            if (article == null) {
-                throw new BizException("关联文章不存在：" + req.getArticleId());
-            }
-            if (!"READY".equals(article.getSummaryStatus()) && !"STALE".equals(article.getSummaryStatus())) {
-                throw new BizException("文章考点摘要未就绪，请先完成提炼");
-            }
-        }
+        ArticleContextMode articleContextMode = ArticleContextMode.orSummary(req.getArticleContextMode());
+        if (req.getArticleId() != null) validateArticleContext(req.getArticleId(), articleContextMode);
 
         GenerateParams params = new GenerateParams();
         params.setCounts(req.getCounts() == null ? Map.of() : req.getCounts());
@@ -253,8 +243,11 @@ public class GenerationService {
         params.setCategory(categoryCode);
         params.setModelProfileId(req.getModelProfileId());
         params.setLanguage(req.getLanguage() == null ? "zh" : req.getLanguage());
+        params.setArticleContextMode(articleContextMode);
 
-        String effective = withArticleSummary(req.getPrompt().trim(), req.getArticleId());
+        String effective = articleContextMode == ArticleContextMode.ORIGINAL
+                ? req.getPrompt().trim()
+                : withArticleContext(req.getPrompt().trim(), req.getArticleId(), articleContextMode);
         String countsBlock = buildCountsBlock(params);
         String optimizePrompt = promptBuilder.buildOptimize(effective, params, countsBlock);
 
@@ -387,6 +380,9 @@ public class GenerationService {
             String instruction = job.getOptimizedPrompt() != null && !job.getOptimizedPrompt().isBlank()
                     ? job.getOptimizedPrompt()
                     : job.getPrompt();
+            if (ArticleContextMode.orSummary(params.getArticleContextMode()) == ArticleContextMode.ORIGINAL) {
+                instruction = withArticleContext(instruction, job.getArticleId(), ArticleContextMode.ORIGINAL);
+            }
             runOneBatch(jobId, type, need, params, instruction, model, counters);
 
             refreshJobStatus(jobId);
@@ -510,7 +506,7 @@ public class GenerationService {
 
             // 0) 未选主分类时，先让模型从已有分类中选或新建
             if (job.getCategory() == null || job.getCategory().isBlank()) {
-                String inferred = classifyCategory(jobId, job, model, counters);
+                String inferred = classifyCategory(jobId, job, params, model, counters);
                 if (inferred != null) {
                     job.setCategory(inferred);
                     params.setCategory(inferred);
@@ -521,10 +517,10 @@ public class GenerationService {
                 }
             }
 
-            // 1) 按需优化用户提示词；关闭自动优化时直接用原文（仍注入文章摘要）
+            // 1) 按需优化用户提示词；关闭自动优化时仍注入所选文章上下文
             String instruction = params.shouldAutoOptimize()
                     ? optimizeUserPrompt(jobId, job, params, model, counters)
-                    : skipOptimizeUserPrompt(jobId, job, counters);
+                    : skipOptimizeUserPrompt(jobId, job, params, counters);
             if (isCancelled(jobId)) {
                 finishCancelled(jobId, counters);
                 return;
@@ -546,7 +542,9 @@ public class GenerationService {
                 batchMapper.insert(gb);
             }
 
-            String finalInstruction = instruction;
+            String finalInstruction = ArticleContextMode.orSummary(params.getArticleContextMode()) == ArticleContextMode.ORIGINAL
+                    ? withArticleContext(instruction, job.getArticleId(), ArticleContextMode.ORIGINAL)
+                    : instruction;
             List<CompletableFuture<String>> futures = batches.stream()
                     .map(b -> CompletableFuture.supplyAsync(() ->
                             runOneBatch(jobId, b.getKey(), b.getValue(), params, finalInstruction,
@@ -606,7 +604,10 @@ public class GenerationService {
     private String optimizeUserPrompt(Long jobId, GenerationJob job, GenerateParams params,
                                       ChatModel model, Counters counters) {
         String original = job.getPrompt() == null ? "" : job.getPrompt().trim();
-        String effective = withArticleSummary(original, job.getArticleId());
+        ArticleContextMode articleContextMode = ArticleContextMode.orSummary(params.getArticleContextMode());
+        String effective = articleContextMode == ArticleContextMode.ORIGINAL
+                ? original
+                : withArticleContext(original, job.getArticleId(), articleContextMode);
         hub.emit(jobId, "optimize_started", Map.of("message", "正在优化出题提示词…"));
         long start = System.nanoTime();
         try {
@@ -669,7 +670,8 @@ public class GenerationService {
      * 用户未选手动分类时：调模型从已有列表选择或提出新建，并写入 exam_category。
      * @return 落库后的 category code；失败返回 null（出题继续，不阻断）
      */
-    private String classifyCategory(Long jobId, GenerationJob job, ChatModel model, Counters counters) {
+    private String classifyCategory(Long jobId, GenerationJob job, GenerateParams params,
+                                    ChatModel model, Counters counters) {
         hub.emit(jobId, "progress", Map.of(
                 "generated", counters.generated.get(),
                 "requested", job.getRequestedCount() == null ? 0 : job.getRequestedCount(),
@@ -680,7 +682,8 @@ public class GenerationService {
         long start = System.nanoTime();
         try {
             String prompt = promptBuilder.buildClassifyCategory(
-                    withArticleSummary(job.getPrompt() == null ? "" : job.getPrompt().trim(), job.getArticleId()));
+                    withArticleContext(job.getPrompt() == null ? "" : job.getPrompt().trim(),
+                            job.getArticleId(), params.getArticleContextMode()));
             ChatResponse resp = callModel(model, prompt);
             accumulateUsage(counters, resp);
             counters.costMs.addAndGet(elapsedMs(start));
@@ -709,11 +712,13 @@ public class GenerationService {
         }
     }
 
-    /** 跳过提示词优化：仍注入文章摘要，并写入 optimizedPrompt 供进度页展示。 */
-    private String skipOptimizeUserPrompt(Long jobId, GenerationJob job, Counters counters) {
-        String effective = withArticleSummary(
-                job.getPrompt() == null ? "" : job.getPrompt().trim(),
-                job.getArticleId());
+    /** 跳过提示词优化：保存短指令；原文模式在分批调用前临时注入正文。 */
+    private String skipOptimizeUserPrompt(Long jobId, GenerationJob job, GenerateParams params, Counters counters) {
+        ArticleContextMode mode = ArticleContextMode.orSummary(params.getArticleContextMode());
+        String original = job.getPrompt() == null ? "" : job.getPrompt().trim();
+        String effective = mode == ArticleContextMode.ORIGINAL
+                ? original
+                : withArticleContext(original, job.getArticleId(), mode);
         GenerationJob update = new GenerationJob();
         update.setId(jobId);
         update.setOptimizedPrompt(effective);
@@ -731,20 +736,45 @@ public class GenerationService {
         return effective;
     }
 
-    /** 文章开卷：把考点摘要拼进优化前的用户意图，避免把长文塞进 prompt 列。 */
-    private String withArticleSummary(String userPrompt, Long articleId) {
+    /** 文章开卷：按任务模式把正文或摘要拼进模型上下文，不塞进 prompt 列。 */
+    private String withArticleContext(String userPrompt, Long articleId, ArticleContextMode requestedMode) {
         if (articleId == null) {
             return userPrompt;
         }
+        ArticleContextMode mode = ArticleContextMode.orSummary(requestedMode);
+        Article article = validateArticleContext(articleId, mode);
+        String content = mode == ArticleContextMode.ORIGINAL
+                ? articleService.readBody(article)
+                : article.getSummaryMd();
+        return appendArticleContext(userPrompt, article.getTitle(), content, mode);
+    }
+
+    static String appendArticleContext(String userPrompt, String title, String content,
+                                       ArticleContextMode requestedMode) {
+        ArticleContextMode mode = ArticleContextMode.orSummary(requestedMode);
+        String normalized = content.trim();
+        if (mode == ArticleContextMode.SUMMARY && normalized.length() > MAX_ARTICLE_SUMMARY_CHARS) {
+            normalized = normalized.substring(0, MAX_ARTICLE_SUMMARY_CHARS) + "\n\n…（摘要过长，已截断）";
+        }
+        String label = mode == ArticleContextMode.ORIGINAL ? "原文" : "考点摘要";
+        return userPrompt + "\n\n===== 文章《" + title + "》" + label + " =====\n" + normalized;
+    }
+
+    private Article validateArticleContext(Long articleId, ArticleContextMode mode) {
         Article article = articleMapper.selectById(articleId);
-        if (article == null || article.getSummaryMd() == null || article.getSummaryMd().isBlank()) {
-            return userPrompt;
+        if (article == null) throw new BizException("关联文章不存在：" + articleId);
+        if (mode == ArticleContextMode.ORIGINAL) {
+            String body = articleService.readBody(article);
+            if (body == null || body.isBlank()) throw new BizException("文章原文为空，无法出题");
+            return article;
         }
-        String summary = article.getSummaryMd().trim();
-        if (summary.length() > MAX_ARTICLE_SUMMARY_CHARS) {
-            summary = summary.substring(0, MAX_ARTICLE_SUMMARY_CHARS) + "\n\n…（摘要过长，已截断）";
+        if (!"READY".equals(article.getSummaryStatus()) && !"STALE".equals(article.getSummaryStatus())) {
+            throw new BizException("文章考点摘要未就绪，请先完成提炼后再出题");
         }
-        return userPrompt + "\n\n===== 文章《" + article.getTitle() + "》考点摘要 =====\n" + summary;
+        if (article.getSummaryMd() == null || article.getSummaryMd().isBlank()) {
+            throw new BizException("文章考点摘要为空，请重新提炼后再出题");
+        }
+        return article;
     }
 
     private void finishCancelled(Long jobId, Counters counters) {

@@ -3,6 +3,7 @@ package com.codespar.service;
 import com.codespar.model.dto.GenerationDTO.GenerateParams;
 import com.codespar.model.dto.GenerationDTO.GenerateRequest;
 import com.codespar.model.enums.QuestionType;
+import com.codespar.model.enums.ArticleContextMode;
 import com.codespar.web.ApiExceptionHandler.BizException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -98,5 +99,39 @@ class GenerationServiceTest {
                 GenerateRequest.class);
         assertEquals(Boolean.FALSE, req.getAutoOptimize());
         assertFalse(GenerateParams.from(req).shouldAutoOptimize());
+    }
+
+    @Test
+    void articleContextModeDefaultsToSummaryAndRoundTripsOriginal() throws Exception {
+        GenerateRequest legacy = new ObjectMapper().readValue(
+                "{\"prompt\":\"x\",\"counts\":{\"SINGLE_CHOICE\":1},\"modelProfileId\":1}",
+                GenerateRequest.class);
+        assertEquals(ArticleContextMode.SUMMARY, GenerateParams.from(legacy).getArticleContextMode());
+
+        GenerateRequest original = new GenerateRequest();
+        original.setArticleContextMode(ArticleContextMode.ORIGINAL);
+        original.setCounts(Map.of(QuestionType.SINGLE_CHOICE, 1));
+        original.setModelProfileId(1L);
+        ObjectMapper mapper = new ObjectMapper();
+        GenerateParams parsed = mapper.readValue(
+                mapper.writeValueAsString(GenerateParams.from(original)), GenerateParams.class);
+        assertEquals(ArticleContextMode.ORIGINAL, parsed.getArticleContextMode());
+    }
+
+    @Test
+    void originalArticleContextIsNotTruncated() {
+        String body = "正文".repeat(10_000);
+        String result = GenerationService.appendArticleContext(
+                "请出题", "长文", body, ArticleContextMode.ORIGINAL);
+        assertTrue(result.endsWith(body));
+        assertFalse(result.contains("已截断"));
+    }
+
+    @Test
+    void summaryArticleContextKeepsExistingLimit() {
+        String summary = "摘要".repeat(10_000);
+        String result = GenerationService.appendArticleContext(
+                "请出题", "长文", summary, ArticleContextMode.SUMMARY);
+        assertTrue(result.contains("摘要过长，已截断"));
     }
 }

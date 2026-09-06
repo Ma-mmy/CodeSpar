@@ -41,6 +41,7 @@ import {
   QUESTION_TYPE_ORDER,
   generationApi,
   type Difficulty,
+  type ArticleContextMode,
   type GenerateRequest,
   type QuestionType,
 } from '@/api/generation'
@@ -62,6 +63,7 @@ const DIFFICULTY_ORDER: Difficulty[] = ['BEGINNER', 'INTERMEDIATE', 'ADVANCED', 
 export type GeneratePrefillState = {
   articleId?: number
   articleTitle?: string
+  articleContextMode?: ArticleContextMode
   prompt?: string
   category?: string
   summaryStale?: boolean
@@ -80,6 +82,10 @@ function articleIdFromSearch(search: string): number | undefined {
   if (!raw) return undefined
   const n = Number(raw)
   return Number.isFinite(n) && n > 0 ? n : undefined
+}
+
+function articleContextModeFromSearch(search: string): ArticleContextMode {
+  return new URLSearchParams(search).get('articleContextMode') === 'ORIGINAL' ? 'ORIGINAL' : 'SUMMARY'
 }
 
 export function GeneratePage() {
@@ -121,11 +127,15 @@ export function GeneratePage() {
     return {
       ...state,
       articleId: state.articleId ?? articleIdFromSearch(location.search),
+      articleContextMode: state.articleContextMode ?? articleContextModeFromSearch(location.search),
     }
   })
   const [prompt, setPrompt] = useState(prefill.prompt ?? '')
   const [articleId, setArticleId] = useState<number | undefined>(prefill.articleId)
   const [articleTitle, setArticleTitle] = useState<string | undefined>(prefill.articleTitle)
+  const [articleContextMode, setArticleContextMode] = useState<ArticleContextMode>(
+    prefill.articleContextMode ?? 'SUMMARY',
+  )
   const [counts, setCounts] = useState<Partial<Record<QuestionType, number>>>(() =>
     prefill.counts ? clampCounts(prefill.counts) : { ...DEFAULT_COUNT_PRESET },
   )
@@ -173,9 +183,13 @@ export function GeneratePage() {
     } else if (state.tags && state.tags.length > 0) {
       toast(`已预填薄弱项「${state.tags.join('、')}」，可改参数后生成`, { variant: 'success' })
     }
-    if (state.articleId != null && searchParams.get('articleId') !== String(state.articleId)) {
+    if (state.articleId != null && (
+      searchParams.get('articleId') !== String(state.articleId) ||
+      searchParams.get('articleContextMode') !== state.articleContextMode
+    )) {
       const next = new URLSearchParams(searchParams)
       next.set('articleId', String(state.articleId))
+      next.set('articleContextMode', state.articleContextMode ?? 'SUMMARY')
       setSearchParams(next, { replace: true })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -268,6 +282,7 @@ export function GeneratePage() {
       return generationApi.optimize({
         prompt: prompt.trim(),
         articleId,
+        articleContextMode,
         counts: countsBody as Partial<Record<QuestionType, number>>,
         difficulty,
         tags: tags.map((t) => t.trim()).filter(Boolean),
@@ -353,6 +368,7 @@ export function GeneratePage() {
     create.mutate({
       prompt: prompt.trim(),
       articleId,
+      articleContextMode,
       counts: countsBody as Record<QuestionType, number>,
       difficulty,
       tags: tags.map((t) => t.trim()).filter(Boolean),
@@ -428,16 +444,19 @@ export function GeneratePage() {
 
         {articleId != null && (
           <Alert variant="info" title="已关联文章">
-            将基于「{articleTitle ?? articleId}」的考点摘要出题（摘要由服务端注入，无需粘贴全文）。
+            将基于「{articleTitle ?? articleId}」的
+            {articleContextMode === 'ORIGINAL' ? '原文' : '考点摘要'}出题（内容由服务端注入，无需粘贴）。
             <button
               type="button"
               className="ml-2 underline"
               onClick={() => {
                 setArticleId(undefined)
                 setArticleTitle(undefined)
+                setArticleContextMode('SUMMARY')
                 if (searchParams.has('articleId')) {
                   const next = new URLSearchParams(searchParams)
                   next.delete('articleId')
+                  next.delete('articleContextMode')
                   setSearchParams(next, { replace: true })
                 }
               }}

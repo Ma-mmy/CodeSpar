@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { Loader2, RefreshCw, Sparkles } from 'lucide-react'
+import { BookOpen, Loader2, RefreshCw, Sparkles } from 'lucide-react'
 import {
   Badge,
   Button,
@@ -19,6 +19,7 @@ import {
   type SummaryStatus,
 } from '@/api/articles'
 import { EXAM_STATUS_LABEL, examsApi, type ExamListItem, type ExamStatus } from '@/api/exams'
+import type { ArticleContextMode } from '@/api/generation'
 
 const STATUS_VARIANT: Record<ExamStatus, 'neutral' | 'primary' | 'success' | 'warning'> = {
   NOT_STARTED: 'neutral',
@@ -95,10 +96,16 @@ export function OpenExamDialog({
     return null
   }
 
-  async function goOpen(forceRefine: boolean) {
+  async function goOpen(mode: ArticleContextMode, forceRefine = false) {
     try {
       let current = article
-      // 新开卷：可用 READY / STALE；无摘要或失败才自动提炼。重新提炼：强制重跑。
+      if (mode === 'ORIGINAL') {
+        const ctx = await articlesApi.openContext(article.id, mode)
+        openGeneratePage(ctx)
+        return
+      }
+
+      // 摘要开卷：可用 READY / STALE；无摘要或失败时自动提炼。重新提炼则强制重跑。
       const mustRefine =
         forceRefine ||
         current.summaryStatus === 'NONE' ||
@@ -121,20 +128,26 @@ export function OpenExamDialog({
         return
       }
 
-      const ctx = await articlesApi.openContext(article.id)
-      onOpenChange(false)
-      navigate(`/generate?articleId=${ctx.articleId}`, {
-        state: {
-          articleId: ctx.articleId,
-          articleTitle: ctx.title,
-          prompt: ctx.prompt,
-          category: ctx.category ?? '',
-          summaryStale: ctx.summaryStatus === 'STALE',
-        },
-      })
+      const ctx = await articlesApi.openContext(article.id, mode)
+      openGeneratePage(ctx)
     } catch (e) {
       toast('开卷失败', { variant: 'danger', description: (e as Error).message })
     }
+  }
+
+  function openGeneratePage(ctx: Awaited<ReturnType<typeof articlesApi.openContext>>) {
+    onOpenChange(false)
+    const mode = ctx.articleContextMode
+    navigate(`/generate?articleId=${ctx.articleId}&articleContextMode=${mode}`, {
+      state: {
+        articleId: ctx.articleId,
+        articleTitle: ctx.title,
+        articleContextMode: mode,
+        prompt: ctx.prompt,
+        category: ctx.category ?? '',
+        summaryStale: mode === 'SUMMARY' && ctx.summaryStatus === 'STALE',
+      },
+    })
   }
 
   const retake = useMutation({
@@ -177,23 +190,31 @@ export function OpenExamDialog({
               type="button"
               variant="primary"
               disabled={refining}
-              onClick={() => void goOpen(false)}
+              onClick={() => void goOpen('SUMMARY')}
             >
               {refining ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-              新开卷
+              根据考点摘要开卷
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => void goOpen('ORIGINAL')}
+            >
+              <BookOpen className="size-4" />
+              根据原文开卷
             </Button>
             <Button
               type="button"
               variant="secondary"
               disabled={refining}
-              onClick={() => void goOpen(true)}
+              onClick={() => void goOpen('SUMMARY', true)}
             >
               <RefreshCw className="size-4" />
               重新提炼后开卷
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            新开卷使用已有考点摘要；重新提炼会先强制刷新摘要。摘要成功后跳转到出题页预填。
+            原文开卷无需提炼；摘要开卷使用已有考点摘要，重新提炼会先强制刷新摘要。
           </p>
 
           <div>

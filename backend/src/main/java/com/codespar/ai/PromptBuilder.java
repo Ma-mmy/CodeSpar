@@ -66,10 +66,24 @@ public class PromptBuilder {
 
     /* ---------------------------------------------------------- 出题 */
 
+    /**
+     * 清理出题 instruction：trim 之外还去掉文内大量换行，
+     * 避免原文空行把 prompt 撑得又稀又长。
+     */
+    static String normalizeInstruction(String instruction) {
+        if (instruction == null || instruction.isBlank()) {
+            return "";
+        }
+        return instruction.trim()
+                .replaceAll("[\\r\\n]+", " ")
+                .replaceAll(" {2,}", " ")
+                .trim();
+    }
+
     /** 生成某一题型的 prompt。 */
     public String buildGenerate(GenerateParams params, String instruction, QuestionType type, int count) {
         Map<String, String> vars = new HashMap<>();
-        vars.put("instruction", instruction.trim());
+        vars.put("instruction", normalizeInstruction(instruction));
         vars.put("type", type.name());
         vars.put("type_label", TYPE_LABEL.get(type));
         vars.put("count", String.valueOf(count));

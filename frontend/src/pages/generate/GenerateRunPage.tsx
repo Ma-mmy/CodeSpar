@@ -49,6 +49,7 @@ function prefillFromJob(job: GenerationView): GeneratePrefillState {
   return {
     prompt: job.prompt,
     articleId: job.articleId,
+    articleContextMode: p?.articleContextMode ?? 'SUMMARY',
     category: job.category ?? p?.category ?? '',
     counts: p?.counts ?? {},
     difficulty: p?.difficulty,
@@ -532,7 +533,9 @@ export function GenerateRunPage() {
               variant="outline"
               size="sm"
               onClick={() =>
-                navigate(job?.articleId != null ? `/generate?articleId=${job.articleId}` : '/generate', {
+                navigate(job?.articleId != null
+                  ? `/generate?articleId=${job.articleId}&articleContextMode=${job.params?.articleContextMode ?? 'SUMMARY'}`
+                  : '/generate', {
                   state: job ? prefillFromJob(job) : undefined,
                 })
               }

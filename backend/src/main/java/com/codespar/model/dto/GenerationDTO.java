@@ -3,6 +3,7 @@ package com.codespar.model.dto;
 import com.codespar.ai.QuestionBatchDTO;
 import com.codespar.model.enums.QuestionDifficulty;
 import com.codespar.model.enums.QuestionType;
+import com.codespar.model.enums.ArticleContextMode;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -22,8 +23,11 @@ public class GenerationDTO {
         @Size(max = 10000, message = "提示词不超过 10000 字")
         private String prompt;
 
-        /** 基于文章考点摘要出题时传入；长文摘要由服务端注入，不塞进 prompt */
+        /** 来源文章；上下文由服务端注入，不塞进 prompt */
         private Long articleId;
+
+        /** 文章上下文：SUMMARY（默认）或 ORIGINAL。 */
+        private ArticleContextMode articleContextMode = ArticleContextMode.SUMMARY;
 
         /** 每种题型要几道（每种最多 20）；value 为 0 的题型不生成。整卷无单独总数上限。 */
         @NotNull(message = "请至少设置一种题型")
@@ -60,6 +64,9 @@ public class GenerationDTO {
         private String prompt;
 
         private Long articleId;
+
+        /** 文章上下文：SUMMARY（默认）或 ORIGINAL。 */
+        private ArticleContextMode articleContextMode = ArticleContextMode.SUMMARY;
 
         private Map<QuestionType, Integer> counts;
 
@@ -127,6 +134,9 @@ public class GenerationDTO {
         /** null / true = 自动优化；false = 跳过 */
         private Boolean autoOptimize;
 
+        /** 文章上下文：SUMMARY（默认）或 ORIGINAL。 */
+        private ArticleContextMode articleContextMode = ArticleContextMode.SUMMARY;
+
         /** 缺省或 true 才跑提示词优化；显式 false 必须跳过。 */
         public boolean shouldAutoOptimize() {
             return autoOptimize == null || Boolean.TRUE.equals(autoOptimize);
@@ -142,6 +152,7 @@ public class GenerationDTO {
             p.modelProfileId = req.getModelProfileId();
             p.language = req.getLanguage();
             p.autoOptimize = req.getAutoOptimize() == null || Boolean.TRUE.equals(req.getAutoOptimize());
+            p.articleContextMode = ArticleContextMode.orSummary(req.getArticleContextMode());
             return p;
         }
     }

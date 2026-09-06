@@ -12,6 +12,7 @@ import com.codespar.model.dto.ArticleDTO.UpdateSummaryRequest;
 import com.codespar.model.dto.ArticleDTO.UpsertArticleRequest;
 import com.codespar.model.dto.ArticleDTO.SyncResult;
 import com.codespar.model.dto.ExamDTO.ExamListItem;
+import com.codespar.model.enums.ArticleContextMode;
 import com.codespar.service.ArticleService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -120,10 +121,11 @@ public class ArticleController {
         return service.updateSummary(id, req);
     }
 
-    /** 开卷预填上下文；摘要未就绪时 400。 */
+    /** 开卷预填上下文；默认使用考点摘要。 */
     @GetMapping("/{id}/open-context")
-    public OpenContext openContext(@PathVariable Long id) {
-        return service.openContext(id);
+    public OpenContext openContext(@PathVariable Long id,
+                                   @RequestParam(defaultValue = "SUMMARY") ArticleContextMode articleContextMode) {
+        return service.openContext(id, articleContextMode);
     }
 
     @GetMapping("/{id}/exams")

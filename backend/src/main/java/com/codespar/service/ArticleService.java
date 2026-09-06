@@ -598,7 +598,14 @@ public class ArticleService {
     }
 
     private JsonNode callRefine(ChatModel chatModel, String prompt) {
-        String raw = extractText(chatModel.call(new Prompt(prompt)));
+        // Some OpenAI-compatible gateways (notably callai.one) enforce a short
+        // non-streaming upstream timeout. Consume the streaming response so the
+        // proxy keeps seeing incremental bytes while Grok is reasoning.
+        List<ChatResponse> chunks = chatModel.stream(new Prompt(prompt)).collectList().block();
+        String raw = chunks == null ? "" : chunks.stream()
+                .map(ArticleService::extractChunkText)
+                .filter(s -> !s.isEmpty())
+                .collect(java.util.stream.Collectors.joining());
         if (raw.isBlank()) throw new IllegalStateException("模型返回空的摘要结果");
         return jsonParser.parse(raw, JsonNode.class);
     }
@@ -783,6 +790,14 @@ public class ArticleService {
         }
         String text = response.getResult().getOutput().getText();
         return text == null ? "" : text.trim();
+    }
+
+    private static String extractChunkText(ChatResponse response) {
+        if (response == null || response.getResult() == null || response.getResult().getOutput() == null) {
+            return "";
+        }
+        String text = response.getResult().getOutput().getText();
+        return text == null ? "" : text;
     }
 
     private static String textOrEmpty(JsonNode node, String field) {

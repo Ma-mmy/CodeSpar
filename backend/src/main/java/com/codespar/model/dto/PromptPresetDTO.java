@@ -42,7 +42,7 @@ public class PromptPresetDTO {
         private String name;
 
         @NotBlank(message = "请填写提示词")
-        @Size(max = 5000, message = "提示词不超过 5000 字")
+        @Size(max = 10000, message = "提示词不超过 10000 字")
         private String prompt;
 
         private Params params;

@@ -19,7 +19,7 @@ public class GenerationDTO {
     @Data
     public static class GenerateRequest {
         @NotBlank(message = "请描述想考什么")
-        @Size(max = 5000, message = "提示词不超过 5000 字")
+        @Size(max = 10000, message = "提示词不超过 10000 字")
         private String prompt;
 
         /** 基于文章考点摘要出题时传入；长文摘要由服务端注入，不塞进 prompt */
@@ -56,7 +56,7 @@ public class GenerationDTO {
     @Data
     public static class OptimizeRequest {
         @NotBlank(message = "请描述想考什么")
-        @Size(max = 5000, message = "提示词不超过 5000 字")
+        @Size(max = 10000, message = "提示词不超过 10000 字")
         private String prompt;
 
         private Long articleId;

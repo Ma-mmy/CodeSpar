@@ -4,7 +4,7 @@
 {{user_prompt}}
 
 ===== 已知出题参数（供你参考，不要改成别的题型）=====
-- 难度：{{difficulty_label}}
+- 难度：{{difficulty_policy}}
 - 语言：{{language_label}}
 - 本卷主分类：{{category_label}}
 {{tags_block}}

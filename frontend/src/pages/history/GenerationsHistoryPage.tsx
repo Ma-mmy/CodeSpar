@@ -26,7 +26,6 @@ import {
 } from '@/components/ui'
 import { categoriesApi } from '@/api/categories'
 import {
-  DIFFICULTIES,
   QUESTION_TYPES,
   QUESTION_TYPE_ORDER,
   generationApi,
@@ -96,9 +95,6 @@ function JobCard({
             <Badge variant={STATUS_VARIANT[status]}>{STATUS_LABEL[status]}</Badge>
             {job.categoryLabel && <Badge variant="outline">{job.categoryLabel}</Badge>}
             {job.modelSnapshot && <Badge variant="outline">{job.modelSnapshot}</Badge>}
-            {job.params?.difficulty && (
-              <Badge variant="outline">{DIFFICULTIES[job.params.difficulty]}</Badge>
-            )}
           </div>
           <p className="mt-2 text-sm leading-relaxed text-foreground">
             {expanded ? job.prompt : job.prompt.length > 120 ? job.prompt.slice(0, 120) + '…' : job.prompt}
@@ -299,7 +295,7 @@ export function GenerationsHistoryPage() {
           <DialogHeader>
             <DialogTitle>用相同参数再出一套题？</DialogTitle>
             <DialogDescription>
-              将复制这条记录的出题描述、题型数量、难度、知识点和模型等参数，创建新的出题任务并立即开始生成。原记录不会改变，生成会再次产生模型用量。
+              将复制这条记录的出题描述、题型数量、知识点和模型等参数，创建新的出题任务并立即开始生成。原记录不会改变，生成会再次产生模型用量。
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

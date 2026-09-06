@@ -202,9 +202,7 @@ public class GenerationService {
         GenerateRequest req = new GenerateRequest();
         req.setPrompt(src.getPrompt());
         req.setCounts(params.getCounts() == null ? Map.of() : params.getCounts());
-        req.setDifficulty(params.getDifficulty() == null
-                ? com.codespar.model.enums.QuestionDifficulty.ADVANCED
-                : params.getDifficulty());
+        req.setDifficulty(params.getDifficulty());
         req.setTags(params.getTags());
         String category = params.getCategory();
         if (category == null || category.isBlank()) {
@@ -236,9 +234,7 @@ public class GenerationService {
 
         GenerateParams params = new GenerateParams();
         params.setCounts(req.getCounts() == null ? Map.of() : req.getCounts());
-        params.setDifficulty(req.getDifficulty() == null
-                ? com.codespar.model.enums.QuestionDifficulty.ADVANCED
-                : req.getDifficulty());
+        params.setDifficulty(req.getDifficulty());
         params.setTags(req.getTags());
         params.setCategory(categoryCode);
         params.setModelProfileId(req.getModelProfileId());

@@ -47,6 +47,11 @@ public class PromptBuilder {
             QuestionDifficulty.ADVANCED, "高级",
             QuestionDifficulty.EXPERT, "专家");
 
+    /** 出题/优化时不再由用户指定单一难度，改为模型按四级适当分配。 */
+    private static final String DIFFICULTY_POLICY =
+            "不要统一难度。请在 BEGINNER / INTERMEDIATE / ADVANCED / EXPERT 四级内适当分配，"
+                    + "本批题目整体覆盖从简单到专家，避免全部挤在同一档；每题 difficulty 字段仍须填写四级之一。";
+
     /** 每个题型的专属规则，逐条写清楚最容易出错的字段约束。 */
     private static final Map<QuestionType, String> TYPE_RULES = Map.of(
             QuestionType.SINGLE_CHOICE,
@@ -87,7 +92,7 @@ public class PromptBuilder {
         vars.put("type", type.name());
         vars.put("type_label", TYPE_LABEL.get(type));
         vars.put("count", String.valueOf(count));
-        vars.put("difficulty_label", DIFFICULTY_LABEL.get(params.getDifficulty()));
+        vars.put("difficulty_policy", DIFFICULTY_POLICY);
         vars.put("language_label", "en".equalsIgnoreCase(params.getLanguage()) ? "英文" : "中文");
         vars.put("category_label", categoryLabel(params.getCategory()));
         vars.put("category_whitelist", categoryService.whitelistText());
@@ -205,9 +210,7 @@ public class PromptBuilder {
     public String buildOptimize(String userPrompt, GenerateParams params, String countsBlock) {
         Map<String, String> vars = new HashMap<>();
         vars.put("user_prompt", userPrompt == null ? "" : userPrompt.trim());
-        vars.put("difficulty_label", DIFFICULTY_LABEL.getOrDefault(
-                params.getDifficulty() == null ? QuestionDifficulty.ADVANCED : params.getDifficulty(),
-                "高级"));
+        vars.put("difficulty_policy", DIFFICULTY_POLICY);
         vars.put("language_label", "en".equalsIgnoreCase(params.getLanguage()) ? "英文" : "中文");
         vars.put("category_label", categoryLabel(params.getCategory()));
         vars.put("tags_block", buildTagsBlock(params.getTags(), params.getCategory()));

@@ -188,7 +188,6 @@ function weakPrompt(tag: string): GeneratePrefillState {
   return {
     tags: [tag],
     prompt: `围绕「${tag}」出题，针对该知识点的薄弱项加深考查。题目贴近真实工程与故障排查，不要只考背诵定义。`,
-    difficulty: 'ADVANCED',
     counts: { SINGLE_CHOICE: 4, SHORT_ANSWER: 3, SYSTEM_DESIGN: 1 },
   }
 }

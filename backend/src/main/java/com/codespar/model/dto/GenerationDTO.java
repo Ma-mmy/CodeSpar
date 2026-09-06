@@ -33,7 +33,11 @@ public class GenerationDTO {
         @NotNull(message = "请至少设置一种题型")
         private Map<QuestionType, Integer> counts;
 
-        private QuestionDifficulty difficulty = QuestionDifficulty.ADVANCED;
+        /**
+         * 已废弃：出题难度由模型在 BEGINNER~EXPERT 间适当分配。
+         * 保留字段仅为兼容旧客户端；新请求可不传。
+         */
+        private QuestionDifficulty difficulty;
 
         /** 用户指定的知识点标签，可选；会尽量归一到主分类白名单 */
         private List<String> tags;
@@ -70,7 +74,8 @@ public class GenerationDTO {
 
         private Map<QuestionType, Integer> counts;
 
-        private QuestionDifficulty difficulty = QuestionDifficulty.ADVANCED;
+        /** 已废弃：难度由模型分配；新请求可不传。 */
+        private QuestionDifficulty difficulty;
 
         private List<String> tags;
 

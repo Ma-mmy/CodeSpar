@@ -16,7 +16,6 @@ import {
   GlassCard,
   Input,
   Label,
-  OptionCard,
   PageContainer,
   PageHeader,
   Select,
@@ -36,11 +35,9 @@ import {
 import { api } from '@/api/client'
 import { modelsApi } from '@/api/models'
 import {
-  DIFFICULTIES,
   QUESTION_TYPES,
   QUESTION_TYPE_ORDER,
   generationApi,
-  type Difficulty,
   type ArticleContextMode,
   type GenerateRequest,
   type QuestionType,
@@ -58,8 +55,6 @@ import {
   resolvedCountPreset,
 } from './countPreset'
 
-const DIFFICULTY_ORDER: Difficulty[] = ['BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'EXPERT']
-
 export type GeneratePrefillState = {
   articleId?: number
   articleTitle?: string
@@ -68,7 +63,6 @@ export type GeneratePrefillState = {
   category?: string
   summaryStale?: boolean
   counts?: Partial<Record<QuestionType, number>>
-  difficulty?: Difficulty
   tags?: string[]
   modelProfileId?: number
   language?: 'zh' | 'en'
@@ -142,7 +136,6 @@ export function GeneratePage() {
   const [countsTouched, setCountsTouched] = useState(false)
   const migratedLegacy = useRef(false)
   const toastedPrefill = useRef(false)
-  const [difficulty, setDifficulty] = useState<Difficulty>(prefill.difficulty ?? 'ADVANCED')
   const [tags, setTags] = useState<string[]>(prefill.tags ?? [])
   const [category, setCategory] = useState<string>(prefill.category ?? '')
   const [modelId, setModelId] = useState<number | undefined>(prefill.modelProfileId)
@@ -164,7 +157,6 @@ export function GeneratePage() {
       state.articleId != null ||
       state.prompt != null ||
       state.counts != null ||
-      state.difficulty != null ||
       state.tags != null ||
       state.category != null ||
       state.modelProfileId != null ||
@@ -222,7 +214,6 @@ export function GeneratePage() {
       if (n > 0) nextCounts[t] = n
     }
     setCounts(clampCounts(nextCounts))
-    if (p.params.difficulty) setDifficulty(p.params.difficulty)
     setTags(p.params.tags ?? [])
     setCategory(p.params.category ?? '')
     if (p.params.language === 'en' || p.params.language === 'zh') setLanguage(p.params.language)
@@ -238,7 +229,6 @@ export function GeneratePage() {
           counts: Object.fromEntries(
             QUESTION_TYPE_ORDER.filter((t) => (counts[t] ?? 0) > 0).map((t) => [t, counts[t]]),
           ),
-          difficulty,
           tags: tags.map((t) => t.trim()).filter(Boolean),
           category: category || undefined,
           language,
@@ -284,7 +274,6 @@ export function GeneratePage() {
         articleId,
         articleContextMode,
         counts: countsBody as Partial<Record<QuestionType, number>>,
-        difficulty,
         tags: tags.map((t) => t.trim()).filter(Boolean),
         category: category || undefined,
         modelProfileId: selectedModelId,
@@ -370,7 +359,6 @@ export function GeneratePage() {
       articleId,
       articleContextMode,
       counts: countsBody as Record<QuestionType, number>,
-      difficulty,
       tags: tags.map((t) => t.trim()).filter(Boolean),
       category: category || undefined,
       modelProfileId: selectedModelId!,
@@ -584,18 +572,6 @@ export function GeneratePage() {
           </div>
         </GlassCard>
 
-        {/* 难度 */}
-        <GlassCard>
-          <h2 className="mb-3 text-sm font-medium">难度</h2>
-          <div className="grid gap-2.5 sm:grid-cols-2">
-            {DIFFICULTY_ORDER.map((d) => (
-              <OptionCard key={d} selected={difficulty === d} onClick={() => setDifficulty(d)}>
-                <span className="flex-1">{DIFFICULTIES[d]}</span>
-              </OptionCard>
-            ))}
-          </div>
-        </GlassCard>
-
         {/* 分类 / 模型 / 语言 / 标签 */}
         <GlassCard>
           <div className="grid gap-5 sm:grid-cols-2">
@@ -715,7 +691,7 @@ export function GeneratePage() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>另存为预设</DialogTitle>
-            <DialogDescription>保存当前提示词、题型数量、难度、标签、分类与语言。</DialogDescription>
+            <DialogDescription>保存当前提示词、题型数量、标签、分类与语言。</DialogDescription>
           </DialogHeader>
           <Field label="名称" required>
             {(id) => (

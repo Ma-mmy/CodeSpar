@@ -53,7 +53,8 @@ export interface GenerateRequest {
   articleId?: number
   articleContextMode?: ArticleContextMode
   counts: Partial<Record<QuestionType, number>>
-  difficulty: Difficulty
+  /** 已废弃：难度由模型分配，前端不再传 */
+  difficulty?: Difficulty
   tags: string[]
   /** 主分类 code，可选；空则模型自动判断 */
   category?: string

@@ -52,7 +52,6 @@ function prefillFromJob(job: GenerationView): GeneratePrefillState {
     articleContextMode: p?.articleContextMode ?? 'SUMMARY',
     category: job.category ?? p?.category ?? '',
     counts: p?.counts ?? {},
-    difficulty: p?.difficulty,
     tags: p?.tags ?? [],
     modelProfileId: job.modelProfileId ?? p?.modelProfileId,
     language,

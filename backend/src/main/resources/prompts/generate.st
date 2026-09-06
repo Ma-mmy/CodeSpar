@@ -8,7 +8,7 @@
 ===== 出题参数 =====
 - 题型：{{type_label}}
 - 题量：{{count}}
-- 难度：{{difficulty_label}}
+- 难度：{{difficulty_policy}}
 - 语言：{{language_label}}
 - 本卷主分类：{{category_label}}
 {{tags_block}}
@@ -29,3 +29,4 @@
 注意：
 1. 共生成 {{count}} 道，不要多不要少。
 2. tags 每题优先带上本卷主分类「{{category_label}}」。
+3. 难度不要统一：在 BEGINNER / INTERMEDIATE / ADVANCED / EXPERT 四级内适当分配，本批整体覆盖从简单到专家，避免全部同一档。
